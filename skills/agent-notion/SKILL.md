@@ -26,17 +26,35 @@ agent-notion page create --parent <parent_id> --title "My New Page"
 
 ## Authentication
 
-Authentication is handled via the `NOTION_TOKEN` environment variable.
+### Integration Token (Official API)
+
+Set the `NOTION_TOKEN` environment variable with your integration token.
 
 ```bash
-# Check auth status and current bot info
+export NOTION_TOKEN=secret_xxx
 agent-notion auth status
 ```
 
-This command returns:
-- Bot user ID
-- Bot name
-- Workspace name
+### Token Extraction (Desktop App)
+
+Extract `token_v2` from the Notion desktop app automatically. No API keys or OAuth needed.
+
+```bash
+# Extract token_v2 from Notion desktop app
+agent-notion auth extract
+
+# Check auth status (shows both integration and token_v2)
+agent-notion auth status
+
+# Remove stored token_v2
+agent-notion auth logout
+```
+
+On macOS, your system may prompt for Keychain access — this is normal and required to decrypt the cookie.
+
+The extracted `token_v2` is stored at `~/.config/agent-notion/credentials.json` with `0600` permissions.
+
+> **Note**: `token_v2` uses Notion's internal API (`/api/v3/`), which is separate from the official public API. The official `@notionhq/client` commands (page, database, block, etc.) require an integration token.
 
 ## Commands
 
@@ -190,3 +208,5 @@ Common errors from the Notion API:
 - Does not support OAuth (token only).
 - Does not support file uploads in v1.
 - Page property updates are limited to simple key=value pairs unless using raw JSON.
+- `auth extract` supports macOS and Linux. Windows DPAPI decryption is not yet supported.
+- `token_v2` uses the unofficial internal API and may break if Notion changes it.
