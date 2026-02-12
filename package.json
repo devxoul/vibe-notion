@@ -1,0 +1,30 @@
+{
+  "name": "agent-notion",
+  "version": "0.1.0",
+  "description": "Notion API CLI for AI agents",
+  "type": "module",
+  "module": "dist/cli.js",
+  "main": "dist/cli.js",
+  "bin": {
+    "agent-notion": "./src/cli.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "postbuild": "bun scripts/postbuild.ts",
+    "test": "bun test src/",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@notionhq/client": "latest",
+    "commander": "latest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@types/bun": "latest",
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}
