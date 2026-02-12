@@ -9,7 +9,7 @@ import {
   resolveSpaceId,
 } from './helpers'
 
-type ListPageOptions = CommandOptions & { workspaceId?: string; depth?: string }
+type ListPageOptions = CommandOptions & { workspaceId: string; depth?: string }
 type LoadPageChunkOptions = CommandOptions & { limit?: string }
 type CreatePageOptions = CommandOptions & { parent: string; title: string }
 type UpdatePageOptions = CommandOptions & { title?: string; icon?: string }
@@ -73,14 +73,14 @@ type PageEntry = {
   children?: PageEntry[]
 }
 
-async function getDefaultSpace(tokenV2: string, spaceId?: string): Promise<{ id: string; pages: string[] }> {
+async function getSpace(tokenV2: string, spaceId: string): Promise<{ id: string; pages: string[] }> {
   const spacesData = (await internalRequest(tokenV2, 'getSpaces', {})) as GetSpacesResponse
   const allSpaces = Object.values(spacesData).flatMap((entry) => Object.values(entry.space ?? {}))
 
-  const space = spaceId ? allSpaces.find((s) => s.value.id === spaceId) : allSpaces[0]
+  const space = allSpaces.find((s) => s.value.id === spaceId)
 
   if (!space) {
-    throw new Error(spaceId ? `Space not found: ${spaceId}` : 'No spaces found')
+    throw new Error(`Space not found: ${spaceId}`)
   }
 
   return { id: space.value.id, pages: space.value.pages ?? [] }
@@ -143,9 +143,12 @@ async function walkPages(
 
 async function listAction(options: ListPageOptions): Promise<void> {
   try {
+    if (!options.workspaceId) {
+      throw new Error('--workspace-id is required. Use `agent-notion workspace list` to find your workspace ID.')
+    }
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const space = await getDefaultSpace(creds.token_v2, options.workspaceId)
+    const space = await getSpace(creds.token_v2, options.workspaceId)
     const maxDepth = options.depth ? Number(options.depth) : 1
 
     const pages = await walkPages(creds.token_v2, space.pages, maxDepth, 0)
@@ -340,7 +343,7 @@ export const pageCommand = new Command('page')
   .addCommand(
     new Command('list')
       .description('List pages in a space')
-      .option('--workspace-id <id>', 'Workspace ID (defaults to first workspace)')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .option('--depth <n>', 'Recursion depth (default: 1)', '1')
       .option('--pretty', 'Pretty print JSON output')
       .action(listAction),

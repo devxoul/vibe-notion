@@ -9,17 +9,51 @@ describe('SearchCommand', () => {
     mock.restore()
   })
 
-  test('search with query and auto-resolves space ID', async () => {
+  test('search errors when --workspace-id is not provided', async () => {
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    mock.module('../client', () => ({
+      internalRequest: mock(async () => ({})),
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-mock'),
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+    }))
+
+    const { searchCommand } = await import('./search')
+    const errorOutput: string[] = []
+    const originalError = console.error
+    console.error = (msg: string) => errorOutput.push(msg)
+
+    let exitCode: number | undefined
+    const originalExit = process.exit
+    process.exit = ((code: number) => {
+      exitCode = code
+    }) as any
+
+    try {
+      await searchCommand.parseAsync(['test query'], { from: 'user' })
+    } catch {
+      // Expected
+    }
+
+    console.error = originalError
+    process.exit = originalExit
+
+    expect(errorOutput.length).toBeGreaterThan(0)
+    const errorMsg = JSON.parse(errorOutput[0])
+    expect(errorMsg.error).toContain('--workspace-id')
+    expect(exitCode).toBe(1)
+  })
+
+  test('search with --workspace-id returns results', async () => {
     const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, _body: any) => {
-      if (endpoint === 'getSpaces') {
-        return {
-          'user-1': {
-            space: {
-              'space-123': {},
-            },
-          },
-        }
-      }
       if (endpoint === 'search') {
         return {
           results: [
@@ -49,6 +83,7 @@ describe('SearchCommand', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-mock'),
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { searchCommand } = await import('./search')
@@ -57,7 +92,7 @@ describe('SearchCommand', () => {
     console.log = (msg: string) => output.push(msg)
 
     try {
-      await searchCommand.parseAsync(['test query'], { from: 'user' })
+      await searchCommand.parseAsync(['test query', '--workspace-id', 'space-123'], { from: 'user' })
     } catch {
       // Expected to exit
     }
@@ -106,6 +141,7 @@ describe('SearchCommand', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-mock'),
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { searchCommand } = await import('./search')
@@ -130,15 +166,6 @@ describe('SearchCommand', () => {
 
   test('search passes limit option', async () => {
     const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
-      if (endpoint === 'getSpaces') {
-        return {
-          'user-1': {
-            space: {
-              'space-123': {},
-            },
-          },
-        }
-      }
       if (endpoint === 'search') {
         expect(body.limit).toBe(50)
         return {
@@ -162,6 +189,7 @@ describe('SearchCommand', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-mock'),
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { searchCommand } = await import('./search')
@@ -170,7 +198,7 @@ describe('SearchCommand', () => {
     console.log = (msg: string) => output.push(msg)
 
     try {
-      await searchCommand.parseAsync(['test query', '--limit', '50'], { from: 'user' })
+      await searchCommand.parseAsync(['test query', '--workspace-id', 'space-123', '--limit', '50'], { from: 'user' })
     } catch {
       // Expected to exit
     }
@@ -181,16 +209,7 @@ describe('SearchCommand', () => {
   })
 
   test('search handles errors', async () => {
-    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string) => {
-      if (endpoint === 'getSpaces') {
-        return {
-          'user-1': {
-            space: {
-              'space-123': {},
-            },
-          },
-        }
-      }
+    const mockInternalRequest = mock(async () => {
       throw new Error('API error')
     })
 
@@ -207,6 +226,7 @@ describe('SearchCommand', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-mock'),
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { searchCommand } = await import('./search')
@@ -221,7 +241,7 @@ describe('SearchCommand', () => {
     }) as any
 
     try {
-      await searchCommand.parseAsync(['test query'], { from: 'user' })
+      await searchCommand.parseAsync(['test query', '--workspace-id', 'space-123'], { from: 'user' })
     } catch {
       // Expected
     }

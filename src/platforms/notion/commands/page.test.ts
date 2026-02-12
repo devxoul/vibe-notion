@@ -9,6 +9,49 @@ describe('PageCommand', () => {
     mock.restore()
   })
 
+  test('page list errors when --workspace-id is not provided', async () => {
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    mock.module('../client', () => ({
+      internalRequest: mock(async () => ({})),
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'uuid-1'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+    }))
+
+    const { pageCommand } = await import('./page')
+    const errorOutput: string[] = []
+    const originalError = console.error
+    console.error = (msg: string) => errorOutput.push(msg)
+
+    let exitCode: number | undefined
+    const originalExit = process.exit
+    process.exit = ((code: number) => {
+      exitCode = code
+    }) as any
+
+    try {
+      await pageCommand.parseAsync(['list'], { from: 'user' })
+    } catch {
+      // Expected
+    }
+
+    console.error = originalError
+    process.exit = originalExit
+
+    expect(errorOutput.length).toBeGreaterThan(0)
+    const errorMsg = JSON.parse(errorOutput[0])
+    expect(errorMsg.error).toContain('--workspace-id')
+    expect(exitCode).toBe(1)
+  })
+
   test('page list returns pages from space', async () => {
     const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string) => {
       if (endpoint === 'getSpaces') {
@@ -76,6 +119,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -84,7 +128,7 @@ describe('PageCommand', () => {
     console.log = (msg: string) => output.push(msg)
 
     try {
-      await pageCommand.parseAsync(['list'], { from: 'user' })
+      await pageCommand.parseAsync(['list', '--workspace-id', 'space-123'], { from: 'user' })
     } catch {
       // Expected to exit
     }
@@ -167,6 +211,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -268,6 +313,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -276,7 +322,7 @@ describe('PageCommand', () => {
     console.log = (msg: string) => output.push(msg)
 
     try {
-      await pageCommand.parseAsync(['list', '--depth', '2'], { from: 'user' })
+      await pageCommand.parseAsync(['list', '--workspace-id', 'space-123', '--depth', '2'], { from: 'user' })
     } catch {
       // Expected to exit
     }
@@ -371,6 +417,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -447,6 +494,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -519,6 +567,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -590,6 +639,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -659,6 +709,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -702,6 +753,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -716,7 +768,7 @@ describe('PageCommand', () => {
     }) as any
 
     try {
-      await pageCommand.parseAsync(['list'], { from: 'user' })
+      await pageCommand.parseAsync(['list', '--workspace-id', 'space-123'], { from: 'user' })
     } catch {
       // Expected
     }
@@ -752,6 +804,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -802,6 +855,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -854,6 +908,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
@@ -906,6 +961,7 @@ describe('PageCommand', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { pageCommand } = await import('./page')
