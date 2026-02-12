@@ -60,6 +60,11 @@ agent-notion auth logout     # Remove stored token_v2
 ### Page Commands
 
 ```bash
+# List pages in a space (defaults to first space, top-level only)
+agent-notion page list --pretty
+agent-notion page list --space-id <space_id> --pretty
+agent-notion page list --depth 2 --pretty
+
 # Get a page and all its content blocks
 agent-notion page get <page_id> --pretty
 agent-notion page get <page_id> --limit 50
