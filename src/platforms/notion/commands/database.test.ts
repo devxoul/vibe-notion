@@ -154,11 +154,7 @@ describe('database query', () => {
 
     // Then
     expect(mockResolveCollectionViewId).toHaveBeenCalledWith('test-token', 'coll-1')
-    expect(mockInternalRequest).toHaveBeenCalledWith(
-      'test-token',
-      'queryCollection',
-      expect.any(Object)
-    )
+    expect(mockInternalRequest).toHaveBeenCalledWith('test-token', 'queryCollection', expect.any(Object))
     expect(output.length).toBeGreaterThan(0)
   })
 
@@ -212,15 +208,11 @@ describe('database query', () => {
     // Then
     expect(mockResolveCollectionViewId).not.toHaveBeenCalled()
     expect(mockInternalRequest.mock.calls.length).toBeGreaterThan(0)
-    const callArgs = mockInternalRequest.mock.calls[0] as unknown as [
-      string,
-      string,
-      Record<string, unknown>,
-    ]
+    const callArgs = mockInternalRequest.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
     expect(callArgs[2]).toEqual(
       expect.objectContaining({
         collectionViewId: 'custom-view-id',
-      })
+      }),
     )
   })
 })
@@ -347,14 +339,14 @@ describe('database create', () => {
 
     // Then
     const saveTransactionCall = mockInternalRequest.mock.calls.find(
-      (call) => (call as unknown[])[1] === 'saveTransactions'
+      (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveTransactionCall).toBeDefined()
     if (saveTransactionCall) {
       expect(saveTransactionCall[2]).toEqual(
         expect.objectContaining({
           transactions: expect.any(Array),
-        })
+        }),
       )
     }
     expect(output.length).toBeGreaterThan(0)
@@ -443,7 +435,7 @@ describe('database update', () => {
 
     // Then
     const saveTransactionCall = mockInternalRequest.mock.calls.find(
-      (call) => (call as unknown[])[1] === 'saveTransactions'
+      (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveTransactionCall).toBeDefined()
     expect(output.length).toBeGreaterThan(0)

@@ -120,10 +120,9 @@ describe('page commands', () => {
       })
 
       // When
-      await pageCommand.parseAsync(
-        ['create', '--parent', 'db-123', '--title', 'DB Entry', '--database'],
-        { from: 'user' }
-      )
+      await pageCommand.parseAsync(['create', '--parent', 'db-123', '--title', 'DB Entry', '--database'], {
+        from: 'user',
+      })
 
       // Then
       expect(mockPageCreate).toHaveBeenCalledWith({
@@ -168,10 +167,9 @@ describe('page commands', () => {
       })
 
       // When
-      await pageCommand.parseAsync(
-        ['update', 'page-123', '--set', 'Status=Done', '--set', 'Priority=High'],
-        { from: 'user' }
-      )
+      await pageCommand.parseAsync(['update', 'page-123', '--set', 'Status=Done', '--set', 'Priority=High'], {
+        from: 'user',
+      })
 
       // Then
       expect(mockPageUpdate).toHaveBeenCalledWith({

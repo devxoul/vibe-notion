@@ -38,5 +38,5 @@ export const authCommand = new Command('auth')
     new Command('status')
       .description('Show authentication status by calling users.me()')
       .option('--pretty', 'Pretty print JSON output')
-      .action(statusAction)
+      .action(statusAction),
   )

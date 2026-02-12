@@ -3,11 +3,7 @@ import { handleError } from '../../../shared/utils/error-handler'
 import { formatOutput } from '../../../shared/utils/output'
 import { getClient } from '../client'
 
-async function listAction(options: {
-  pageSize?: number
-  startCursor?: string
-  pretty?: boolean
-}): Promise<void> {
+async function listAction(options: { pageSize?: number; startCursor?: string; pretty?: boolean }): Promise<void> {
   try {
     const client = getClient()
     const response = await client.users.list({
@@ -70,18 +66,18 @@ export const userCommand = new Command('user')
       .option('--page-size <n>', 'Number of users per page', (val) => parseInt(val, 10))
       .option('--start-cursor <cursor>', 'Pagination cursor')
       .option('--pretty', 'Pretty print JSON output')
-      .action(listAction)
+      .action(listAction),
   )
   .addCommand(
     new Command('get')
       .description('Retrieve a specific user')
       .argument('<user_id>', 'User ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('me')
       .description('Get current bot/integration user info')
       .option('--pretty', 'Pretty print JSON output')
-      .action(meAction)
+      .action(meAction),
   )

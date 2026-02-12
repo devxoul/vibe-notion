@@ -22,7 +22,7 @@ describe('CommentCommands', () => {
             ],
             next_cursor: null,
             has_more: false,
-          })
+          }),
         ),
       },
     }
@@ -57,7 +57,7 @@ describe('CommentCommands', () => {
             results: [],
             next_cursor: 'cursor-123',
             has_more: true,
-          })
+          }),
         ),
       },
     }
@@ -72,10 +72,9 @@ describe('CommentCommands', () => {
     console.log = (msg: string) => output.push(msg)
 
     try {
-      await cmd.parseAsync(
-        ['list', '--page', 'page-123', '--page-size', '10', '--start-cursor', 'cursor-456'],
-        { from: 'user' }
-      )
+      await cmd.parseAsync(['list', '--page', 'page-123', '--page-size', '10', '--start-cursor', 'cursor-456'], {
+        from: 'user',
+      })
     } catch {
       // Expected to exit
     }
@@ -98,7 +97,7 @@ describe('CommentCommands', () => {
             created_by: { id: 'user-1', object: 'user' },
             rich_text: [{ type: 'text', text: { content: 'New comment' } }],
             discussion_id: 'discussion-new',
-          })
+          }),
         ),
       },
     }
@@ -138,7 +137,7 @@ describe('CommentCommands', () => {
             created_by: { id: 'user-1', object: 'user' },
             rich_text: [{ type: 'text', text: { content: 'Reply text' } }],
             discussion_id: 'discussion-1',
-          })
+          }),
         ),
       },
     }
@@ -178,7 +177,7 @@ describe('CommentCommands', () => {
             created_by: { id: 'user-1', object: 'user' },
             rich_text: [{ type: 'text', text: { content: 'Test comment' } }],
             discussion_id: 'discussion-1',
-          })
+          }),
         ),
       },
     }

@@ -10,7 +10,7 @@ describe('UserCommand', () => {
   })
 
   test('user list returns users from getSpaces response', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string) => {
       if (endpoint === 'getSpaces') {
         return {
           'user-1': {
@@ -75,7 +75,7 @@ describe('UserCommand', () => {
   })
 
   test('user get returns specific user from syncRecordValues', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string, body: any) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
       if (endpoint === 'syncRecordValues') {
         expect(body.requests[0].pointer.table).toBe('notion_user')
         expect(body.requests[0].pointer.id).toBe('user-id-123')
@@ -133,7 +133,7 @@ describe('UserCommand', () => {
   })
 
   test('user me returns current user with spaces from loadUserContent', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string) => {
       if (endpoint === 'loadUserContent') {
         return {
           recordMap: {

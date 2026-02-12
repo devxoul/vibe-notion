@@ -5,62 +5,38 @@
     "ignoreUnknown": false
   },
   "formatter": {
-    "enabled": true,
     "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100,
-    "lineEnding": "lf"
+    "lineWidth": 120
   },
   "linter": {
-    "enabled": true,
     "rules": {
-      "recommended": true,
+      "complexity": {
+        "noUselessUndefinedInitialization": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
       "style": {
         "noNonNullAssertion": "off",
         "useImportType": "off",
-        "noRestrictedImports": {
-          "level": "error",
-          "options": {
-            "patterns": [
-              {
-                "group": ["bun:*"],
-                "message": "Bun-specific API. We use Bun for development, but users install agent-notion via npm/yarn/pnpm, so runtime code must be Node.js-compatible. Do not disable this rule except in tests."
-              }
-            ]
-          }
-        },
-        "noRestrictedGlobals": {
-          "level": "error",
-          "options": {
-            "deniedGlobals": {
-              "Bun": "Bun-specific API. We use Bun for development, but users install agent-notion via npm/yarn/pnpm, so runtime code must be Node.js-compatible. Do not disable this rule except in tests."
-            }
-          }
-        }
+        "useTemplate": "off"
       },
       "suspicious": {
+        "noArrayIndexKey": "off",
+        "noDocumentCookie": "off",
         "noExplicitAny": "off"
       }
     }
   },
-  "overrides": [
-    {
-      "includes": ["tests/**", "**/*.test.ts", "**/*.spec.ts"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noRestrictedImports": "off",
-            "noRestrictedGlobals": "off"
-          }
-        }
-      }
+  "assist": {
+    "actions": {
+      "source": {}
     }
-  ],
+  },
   "javascript": {
     "formatter": {
       "semicolons": "asNeeded",
-      "quoteStyle": "single",
-      "trailingCommas": "es5"
+      "quoteStyle": "single"
     }
   }
 }

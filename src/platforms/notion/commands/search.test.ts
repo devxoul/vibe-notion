@@ -10,7 +10,7 @@ describe('SearchCommand', () => {
   })
 
   test('search with query and auto-resolves space ID', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string, body: any) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, _body: any) => {
       if (endpoint === 'getSpaces') {
         return {
           'user-1': {
@@ -75,7 +75,7 @@ describe('SearchCommand', () => {
   })
 
   test('search with explicit workspace-id', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string, body: any) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
       if (endpoint === 'search') {
         expect(body.spaceId).toBe('space-456')
         return {
@@ -129,7 +129,7 @@ describe('SearchCommand', () => {
   })
 
   test('search passes limit option', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string, body: any) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
       if (endpoint === 'getSpaces') {
         return {
           'user-1': {
@@ -181,7 +181,7 @@ describe('SearchCommand', () => {
   })
 
   test('search handles errors', async () => {
-    const mockInternalRequest = mock(async (tokenV2: string, endpoint: string) => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string) => {
       if (endpoint === 'getSpaces') {
         return {
           'user-1': {

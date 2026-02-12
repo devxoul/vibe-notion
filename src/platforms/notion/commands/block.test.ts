@@ -34,9 +34,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -84,9 +82,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -170,9 +166,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -233,9 +227,7 @@ describe('blockCommand', () => {
           },
         })
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -275,9 +267,7 @@ describe('blockCommand', () => {
     test('parses block definitions and creates blocks', async () => {
       // Given
       const mockInternalRequest = mock(() => Promise.resolve({}))
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
 
@@ -300,13 +290,8 @@ describe('blockCommand', () => {
       try {
         // When
         await blockCommand.parseAsync(
-          [
-            'append',
-            'parent-1',
-            '--content',
-            JSON.stringify([{ type: 'text', properties: { title: [['Hello']] } }]),
-          ],
-          { from: 'user' }
+          ['append', 'parent-1', '--content', JSON.stringify([{ type: 'text', properties: { title: [['Hello']] } }])],
+          { from: 'user' },
         )
       } catch {
         // Expected to exit
@@ -325,9 +310,7 @@ describe('blockCommand', () => {
     test('calls saveTransactions with set and listAfter operations', async () => {
       // Given
       const mockInternalRequest = mock(() => Promise.resolve({}))
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
 
@@ -349,10 +332,9 @@ describe('blockCommand', () => {
 
       try {
         // When
-        await blockCommand.parseAsync(
-          ['append', 'parent-1', '--content', JSON.stringify([{ type: 'text' }])],
-          { from: 'user' }
-        )
+        await blockCommand.parseAsync(['append', 'parent-1', '--content', JSON.stringify([{ type: 'text' }])], {
+          from: 'user',
+        })
       } catch {
         // Expected to exit
       }
@@ -381,16 +363,14 @@ describe('blockCommand', () => {
               ]),
             }),
           ]),
-        })
+        }),
       )
     })
 
     test('errors on invalid JSON content', async () => {
       // Given
       const mockInternalRequest = mock(() => Promise.resolve({}))
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -437,9 +417,7 @@ describe('blockCommand', () => {
     test('errors when block definition missing type', async () => {
       // Given
       const mockInternalRequest = mock(() => Promise.resolve({}))
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -467,10 +445,9 @@ describe('blockCommand', () => {
 
       try {
         // When
-        await blockCommand.parseAsync(
-          ['append', 'parent-1', '--content', JSON.stringify([{ properties: {} }])],
-          { from: 'user' }
-        )
+        await blockCommand.parseAsync(['append', 'parent-1', '--content', JSON.stringify([{ properties: {} }])], {
+          from: 'user',
+        })
       } catch {
         // Expected
       }
@@ -511,9 +488,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -536,13 +511,8 @@ describe('blockCommand', () => {
       try {
         // When
         await blockCommand.parseAsync(
-          [
-            'update',
-            'block-123',
-            '--content',
-            JSON.stringify({ properties: { title: [['Updated']] } }),
-          ],
-          { from: 'user' }
+          ['update', 'block-123', '--content', JSON.stringify({ properties: { title: [['Updated']] } })],
+          { from: 'user' },
         )
       } catch {
         // Expected to exit
@@ -578,9 +548,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -602,10 +570,9 @@ describe('blockCommand', () => {
 
       try {
         // When
-        await blockCommand.parseAsync(
-          ['update', 'block-123', '--content', JSON.stringify({ version: 2 })],
-          { from: 'user' }
-        )
+        await blockCommand.parseAsync(['update', 'block-123', '--content', JSON.stringify({ version: 2 })], {
+          from: 'user',
+        })
       } catch {
         // Expected to exit
       }
@@ -623,9 +590,7 @@ describe('blockCommand', () => {
     test('errors on non-object content', async () => {
       // Given
       const mockInternalRequest = mock(() => Promise.resolve({}))
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -653,10 +618,7 @@ describe('blockCommand', () => {
 
       try {
         // When
-        await blockCommand.parseAsync(
-          ['update', 'block-123', '--content', JSON.stringify(['array'])],
-          { from: 'user' }
-        )
+        await blockCommand.parseAsync(['update', 'block-123', '--content', JSON.stringify(['array'])], { from: 'user' })
       } catch {
         // Expected
       }
@@ -695,9 +657,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -756,9 +716,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 
@@ -807,7 +765,7 @@ describe('blockCommand', () => {
               ]),
             }),
           ]),
-        })
+        }),
       )
     })
 
@@ -833,9 +791,7 @@ describe('blockCommand', () => {
         }
         return Promise.resolve({})
       })
-      const mockGetCredentials = mock(() =>
-        Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })
-      )
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
 

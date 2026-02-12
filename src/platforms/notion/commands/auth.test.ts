@@ -12,9 +12,7 @@ let consoleErrorMock: ReturnType<typeof mock>
 beforeEach(() => {
   mockExtract = mock(() => Promise.resolve({ token_v2: 'v02%3Atest-token', user_id: 'user-1' }))
   mockSetCredentials = mock(() => Promise.resolve())
-  mockGetCredentials = mock(() =>
-    Promise.resolve({ token_v2: 'v02%3Atest-token', user_id: 'user-1' })
-  )
+  mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'v02%3Atest-token', user_id: 'user-1' }))
   mockRemove = mock(() => Promise.resolve())
   mockFetch = mock(() => Promise.resolve({ ok: true }))
   mockExit = mock(() => {
@@ -47,9 +45,7 @@ beforeEach(() => {
 describe('auth status', () => {
   test('outputs stored credentials with masked token', async () => {
     // Given
-    mockGetCredentials = mock(() =>
-      Promise.resolve({ token_v2: 'v02%3Atest-token', user_id: 'user-1' })
-    )
+    mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'v02%3Atest-token', user_id: 'user-1' }))
     mock.module('../credential-manager', () => ({
       CredentialManager: class {
         setCredentials = mockSetCredentials
@@ -121,9 +117,7 @@ describe('auth logout', () => {
 describe('auth extract', () => {
   test('extracts token, validates via fetch, stores credentials, outputs masked token', async () => {
     // Given
-    mockExtract = mock(() =>
-      Promise.resolve({ token_v2: 'v02%3Atest-token-long', user_id: 'user-1' })
-    )
+    mockExtract = mock(() => Promise.resolve({ token_v2: 'v02%3Atest-token-long', user_id: 'user-1' }))
     mockSetCredentials = mock(() => Promise.resolve())
     mockFetch = mock(() => Promise.resolve({ ok: true }))
 

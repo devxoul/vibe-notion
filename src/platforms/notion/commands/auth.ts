@@ -60,8 +60,8 @@ async function extractAction(options: CommandOptions): Promise<void> {
             error: 'No token_v2 found. Make sure Notion desktop app is installed and logged in.',
             hint: options.debug ? undefined : 'Run with --debug for more info.',
           },
-          options.pretty
-        )
+          options.pretty,
+        ),
       )
       process.exit(1)
     }
@@ -82,8 +82,8 @@ async function extractAction(options: CommandOptions): Promise<void> {
           user_id: extracted.user_id,
           valid: true,
         },
-        options.pretty
-      )
+        options.pretty,
+      ),
     )
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
@@ -130,17 +130,17 @@ export const authCommand = new Command('auth')
       .description('Extract token_v2 from Notion desktop app')
       .option('--pretty', 'Pretty print JSON output')
       .option('--debug', 'Show debug output for troubleshooting')
-      .action(extractAction)
+      .action(extractAction),
   )
   .addCommand(
     new Command('logout')
       .description('Remove locally stored token_v2 credentials')
       .option('--pretty', 'Pretty print JSON output')
-      .action(logoutAction)
+      .action(logoutAction),
   )
   .addCommand(
     new Command('status')
       .description('Show stored credential status')
       .option('--pretty', 'Pretty print JSON output')
-      .action(statusAction)
+      .action(statusAction),
   )

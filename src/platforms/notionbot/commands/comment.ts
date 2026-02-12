@@ -29,7 +29,7 @@ async function listAction(options: {
 
 async function createAction(
   text: string,
-  options: { page?: string; discussion?: string; pretty?: boolean }
+  options: { page?: string; discussion?: string; pretty?: boolean },
 ): Promise<void> {
   try {
     if (!options.page && !options.discussion) {
@@ -90,7 +90,7 @@ export const commentCommand = new Command('comment')
       .option('--page-size <n>', 'Number of results per page', (val) => parseInt(val, 10))
       .option('--start-cursor <cursor>', 'Pagination cursor')
       .option('--pretty', 'Pretty print JSON output')
-      .action(listAction)
+      .action(listAction),
   )
   .addCommand(
     new Command('create')
@@ -99,12 +99,12 @@ export const commentCommand = new Command('comment')
       .option('--page <page_id>', 'Page ID (for new comment)')
       .option('--discussion <discussion_id>', 'Discussion ID (for reply)')
       .option('--pretty', 'Pretty print JSON output')
-      .action(createAction)
+      .action(createAction),
   )
   .addCommand(
     new Command('get')
       .description('Retrieve a specific comment')
       .argument('<comment_id>', 'Comment ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )

@@ -99,9 +99,7 @@ function parseBlockDefinitions(content: string): BlockDefinition[] {
 
     if (
       def.properties !== undefined &&
-      (typeof def.properties !== 'object' ||
-        def.properties === null ||
-        Array.isArray(def.properties))
+      (typeof def.properties !== 'object' || def.properties === null || Array.isArray(def.properties))
     ) {
       throw new Error('Block definition properties must be an object when provided')
     }
@@ -121,10 +119,7 @@ function parseUpdateContent(content: string): Record<string, unknown> {
   return parsed as Record<string, unknown>
 }
 
-function getBlockById(
-  blockMap: Record<string, BlockRecord>,
-  blockId: string
-): BlockValue | undefined {
+function getBlockById(blockMap: Record<string, BlockRecord>, blockId: string): BlockValue | undefined {
   const direct = blockMap[blockId]?.value
   if (direct) {
     return direct
@@ -221,7 +216,7 @@ async function appendAction(parentId: string, options: AppendOptions): Promise<v
           command: 'listAfter',
           path: ['content'],
           args: { id: newBlockId },
-        }
+        },
       )
     }
 
@@ -331,7 +326,7 @@ export const blockCommand = new Command('block')
       .description('Retrieve a block')
       .argument('<block_id>', 'Block ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('children')
@@ -339,7 +334,7 @@ export const blockCommand = new Command('block')
       .argument('<block_id>', 'Block ID')
       .option('--limit <n>', 'Number of child blocks to load')
       .option('--pretty', 'Pretty print JSON output')
-      .action(childrenAction)
+      .action(childrenAction),
   )
   .addCommand(
     new Command('append')
@@ -347,7 +342,7 @@ export const blockCommand = new Command('block')
       .argument('<parent_id>', 'Parent block ID')
       .requiredOption('--content <json>', 'Block definitions as JSON array')
       .option('--pretty', 'Pretty print JSON output')
-      .action(appendAction)
+      .action(appendAction),
   )
   .addCommand(
     new Command('update')
@@ -355,12 +350,12 @@ export const blockCommand = new Command('block')
       .argument('<block_id>', 'Block ID')
       .requiredOption('--content <json>', 'Block update content as JSON object')
       .option('--pretty', 'Pretty print JSON output')
-      .action(updateAction)
+      .action(updateAction),
   )
   .addCommand(
     new Command('delete')
       .description('Delete (archive) a block')
       .argument('<block_id>', 'Block ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(deleteAction)
+      .action(deleteAction),
   )

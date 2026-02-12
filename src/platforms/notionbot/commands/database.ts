@@ -24,7 +24,7 @@ async function queryAction(
     sort?: string
     pageSize?: string
     startCursor?: string
-  }
+  },
 ): Promise<void> {
   try {
     const client = getClient()
@@ -55,7 +55,7 @@ async function queryAction(
 }
 
 async function createAction(
-  options: PrettyOption & { parent: string; title: string; properties?: string }
+  options: PrettyOption & { parent: string; title: string; properties?: string },
 ): Promise<void> {
   try {
     const client = getClient()
@@ -74,7 +74,7 @@ async function createAction(
 
 async function updateAction(
   databaseId: string,
-  options: PrettyOption & { title?: string; properties?: string }
+  options: PrettyOption & { title?: string; properties?: string },
 ): Promise<void> {
   try {
     const client = getClient()
@@ -94,9 +94,7 @@ async function updateAction(
   }
 }
 
-async function listAction(
-  options: PrettyOption & { pageSize?: string; startCursor?: string }
-): Promise<void> {
+async function listAction(options: PrettyOption & { pageSize?: string; startCursor?: string }): Promise<void> {
   try {
     const client = getClient()
     const params: Record<string, unknown> = {
@@ -124,7 +122,7 @@ export const databaseCommand = new Command('database')
       .description('Retrieve a database schema')
       .argument('<database_id>', 'Database ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('query')
@@ -135,7 +133,7 @@ export const databaseCommand = new Command('database')
       .option('--page-size <n>', 'Number of results per page')
       .option('--start-cursor <cursor>', 'Pagination cursor')
       .option('--pretty', 'Pretty print JSON output')
-      .action(queryAction)
+      .action(queryAction),
   )
   .addCommand(
     new Command('create')
@@ -144,7 +142,7 @@ export const databaseCommand = new Command('database')
       .requiredOption('--title <title>', 'Database title')
       .option('--properties <json>', 'Properties schema as JSON string')
       .option('--pretty', 'Pretty print JSON output')
-      .action(createAction)
+      .action(createAction),
   )
   .addCommand(
     new Command('update')
@@ -153,7 +151,7 @@ export const databaseCommand = new Command('database')
       .option('--title <title>', 'New database title')
       .option('--properties <json>', 'Properties schema as JSON string')
       .option('--pretty', 'Pretty print JSON output')
-      .action(updateAction)
+      .action(updateAction),
   )
   .addCommand(
     new Command('list')
@@ -161,5 +159,5 @@ export const databaseCommand = new Command('database')
       .option('--page-size <n>', 'Number of results per page')
       .option('--start-cursor <cursor>', 'Pagination cursor')
       .option('--pretty', 'Pretty print JSON output')
-      .action(listAction)
+      .action(listAction),
   )

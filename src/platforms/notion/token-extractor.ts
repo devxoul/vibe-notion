@@ -73,9 +73,7 @@ export class TokenExtractor {
       const ciphertext = encrypted.subarray(3)
       const iv = Buffer.alloc(16, ' ')
       const decipher = createDecipheriv('aes-128-cbc', key, iv)
-      const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
-        'utf8'
-      )
+      const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
 
       // Extract token from decrypted data (may have padding/garbage before it)
       const match = decrypted.match(/v\d+(%3A|:)[A-Za-z0-9_.%-]+/)
@@ -101,17 +99,13 @@ export class TokenExtractor {
     try {
       let password: string
       try {
-        password = execSync(
-          'security find-generic-password -s "Notion Safe Storage" -w 2>/dev/null',
-          {
-            encoding: 'utf8',
-          }
-        ).trim()
+        password = execSync('security find-generic-password -s "Notion Safe Storage" -w 2>/dev/null', {
+          encoding: 'utf8',
+        }).trim()
       } catch {
-        password = execSync(
-          'security find-generic-password -ga "Notion" -s "Notion Safe Storage" -w 2>/dev/null',
-          { encoding: 'utf8' }
-        ).trim()
+        password = execSync('security find-generic-password -ga "Notion" -s "Notion Safe Storage" -w 2>/dev/null', {
+          encoding: 'utf8',
+        }).trim()
       }
 
       return pbkdf2Sync(password, 'saltysalt', 1003, 16, 'sha1')
@@ -142,10 +136,7 @@ export class TokenExtractor {
   }
 
   private readTokenFromDb(dbPath: string): ExtractedToken | null {
-    const tempDbPath = join(
-      tmpdir(),
-      `notion-cookies-${Date.now()}-${Math.random().toString(36).slice(2)}.db`
-    )
+    const tempDbPath = join(tmpdir(), `notion-cookies-${Date.now()}-${Math.random().toString(36).slice(2)}.db`)
 
     try {
       copyFileSync(dbPath, tempDbPath)

@@ -35,10 +35,7 @@ async function createAction(options: {
   }
 }
 
-function parsePropertyPair(
-  value: string,
-  previous: Record<string, string>
-): Record<string, string> {
+function parsePropertyPair(value: string, previous: Record<string, string>): Record<string, string> {
   const eqIndex = value.indexOf('=')
   if (eqIndex === -1) {
     throw new Error(`Invalid property format: "${value}". Expected key=value`)
@@ -48,10 +45,7 @@ function parsePropertyPair(
   return { ...previous, [key]: val }
 }
 
-async function updateAction(
-  pageId: string,
-  options: { set: Record<string, string>; pretty?: boolean }
-): Promise<void> {
+async function updateAction(pageId: string, options: { set: Record<string, string>; pretty?: boolean }): Promise<void> {
   try {
     const client = getClient()
     const page = await client.pages.update({
@@ -77,11 +71,7 @@ async function archiveAction(pageId: string, options: { pretty?: boolean }): Pro
   }
 }
 
-async function propertyAction(
-  pageId: string,
-  propertyId: string,
-  options: { pretty?: boolean }
-): Promise<void> {
+async function propertyAction(pageId: string, propertyId: string, options: { pretty?: boolean }): Promise<void> {
   try {
     const client = getClient()
     const property = await client.pages.properties.retrieve({
@@ -101,7 +91,7 @@ export const pageCommand = new Command('page')
       .description('Retrieve a page')
       .argument('<page_id>', 'Page ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('create')
@@ -110,7 +100,7 @@ export const pageCommand = new Command('page')
       .requiredOption('--title <title>', 'Page title')
       .option('--database', 'Parent is a database (default: page)')
       .option('--pretty', 'Pretty print JSON output')
-      .action(createAction)
+      .action(createAction),
   )
   .addCommand(
     new Command('update')
@@ -118,14 +108,14 @@ export const pageCommand = new Command('page')
       .argument('<page_id>', 'Page ID')
       .option('--set <property=value>', 'Set a property value (repeatable)', parsePropertyPair, {})
       .option('--pretty', 'Pretty print JSON output')
-      .action(updateAction)
+      .action(updateAction),
   )
   .addCommand(
     new Command('archive')
       .description('Archive a page')
       .argument('<page_id>', 'Page ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(archiveAction)
+      .action(archiveAction),
   )
   .addCommand(
     new Command('property')
@@ -133,5 +123,5 @@ export const pageCommand = new Command('page')
       .argument('<page_id>', 'Page ID')
       .argument('<property_id>', 'Property ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(propertyAction)
+      .action(propertyAction),
   )

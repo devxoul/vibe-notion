@@ -4,8 +4,8 @@ import { randomUUID } from 'node:crypto'
 // Test helpers functions by directly testing the logic they implement,
 // using mocked dependencies. This avoids Bun's cross-file mock.module contamination.
 
-let _mockInternalRequest: Function = () => Promise.resolve({})
-let _mockGetCredentials: Function = () => Promise.resolve(null)
+let _mockInternalRequest: (...args: unknown[]) => unknown = () => Promise.resolve({})
+let _mockGetCredentials: (...args: unknown[]) => unknown = () => Promise.resolve(null)
 
 afterEach(() => {
   _mockInternalRequest = () => Promise.resolve({})
@@ -121,7 +121,7 @@ describe('getCredentialsOrExit', () => {
     try {
       await getCredentialsOrExit().catch(() => {})
       expect(consoleErrorMock).toHaveBeenCalledWith(
-        JSON.stringify({ error: 'Not authenticated. Run: agent-notion auth extract' })
+        JSON.stringify({ error: 'Not authenticated. Run: agent-notion auth extract' }),
       )
     } finally {
       console.error = originalError
@@ -141,17 +141,16 @@ describe('resolveSpaceId', () => {
   })
 
   test('throws when block has no space_id', async () => {
-    _mockInternalRequest = () =>
-      Promise.resolve({ recordMap: { block: { 'block-123': { value: {} } } } })
+    _mockInternalRequest = () => Promise.resolve({ recordMap: { block: { 'block-123': { value: {} } } } })
     await expect(resolveSpaceId('token', 'block-123')).rejects.toThrow(
-      'Could not resolve space ID for block: block-123'
+      'Could not resolve space ID for block: block-123',
     )
   })
 
   test('throws when block not found in response', async () => {
     _mockInternalRequest = () => Promise.resolve({ recordMap: { block: {} } })
     await expect(resolveSpaceId('token', 'block-123')).rejects.toThrow(
-      'Could not resolve space ID for block: block-123'
+      'Could not resolve space ID for block: block-123',
     )
   })
 
@@ -215,17 +214,12 @@ describe('resolveCollectionViewId', () => {
 
   test('throws when collection not found', async () => {
     _mockInternalRequest = () => Promise.resolve({ recordMap: { collection: {} } })
-    await expect(resolveCollectionViewId('token', 'coll-123')).rejects.toThrow(
-      'Collection not found: coll-123'
-    )
+    await expect(resolveCollectionViewId('token', 'coll-123')).rejects.toThrow('Collection not found: coll-123')
   })
 
   test('throws when collection has no parent_id', async () => {
-    _mockInternalRequest = () =>
-      Promise.resolve({ recordMap: { collection: { 'coll-123': { value: {} } } } })
-    await expect(resolveCollectionViewId('token', 'coll-123')).rejects.toThrow(
-      'Collection not found: coll-123'
-    )
+    _mockInternalRequest = () => Promise.resolve({ recordMap: { collection: { 'coll-123': { value: {} } } } })
+    await expect(resolveCollectionViewId('token', 'coll-123')).rejects.toThrow('Collection not found: coll-123')
   })
 
   test('throws when parent block has no view_ids', async () => {
@@ -240,7 +234,7 @@ describe('resolveCollectionViewId', () => {
       return Promise.resolve({ recordMap: { block: { 'block-456': { value: {} } } } })
     }
     await expect(resolveCollectionViewId('token', 'coll-123')).rejects.toThrow(
-      'No views found for collection: coll-123'
+      'No views found for collection: coll-123',
     )
   })
 
@@ -256,7 +250,7 @@ describe('resolveCollectionViewId', () => {
       return Promise.resolve({ recordMap: { block: {} } })
     }
     await expect(resolveCollectionViewId('token', 'coll-123')).rejects.toThrow(
-      'No views found for collection: coll-123'
+      'No views found for collection: coll-123',
     )
   })
 })

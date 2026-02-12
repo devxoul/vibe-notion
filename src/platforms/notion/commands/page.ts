@@ -67,10 +67,7 @@ type PageEntry = {
   children?: PageEntry[]
 }
 
-async function getDefaultSpace(
-  tokenV2: string,
-  spaceId?: string
-): Promise<{ id: string; pages: string[] }> {
+async function getDefaultSpace(tokenV2: string, spaceId?: string): Promise<{ id: string; pages: string[] }> {
   const spacesData = (await internalRequest(tokenV2, 'getSpaces', {})) as GetSpacesResponse
   const allSpaces = Object.values(spacesData).flatMap((entry) => Object.values(entry.space ?? {}))
 
@@ -95,7 +92,7 @@ async function walkPages(
   tokenV2: string,
   pageIds: string[],
   maxDepth: number,
-  currentDepth: number
+  currentDepth: number,
 ): Promise<PageEntry[]> {
   if (pageIds.length === 0) return []
 
@@ -339,7 +336,7 @@ export const pageCommand = new Command('page')
       .option('--workspace-id <id>', 'Workspace ID (defaults to first workspace)')
       .option('--depth <n>', 'Recursion depth (default: 1)', '1')
       .option('--pretty', 'Pretty print JSON output')
-      .action(listAction)
+      .action(listAction),
   )
   .addCommand(
     new Command('get')
@@ -347,7 +344,7 @@ export const pageCommand = new Command('page')
       .argument('<page_id>')
       .option('--limit <n>', 'Block limit')
       .option('--pretty')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('create')
@@ -355,7 +352,7 @@ export const pageCommand = new Command('page')
       .requiredOption('--parent <id>', 'Parent page or block ID')
       .requiredOption('--title <title>', 'Page title')
       .option('--pretty')
-      .action(createAction)
+      .action(createAction),
   )
   .addCommand(
     new Command('update')
@@ -364,12 +361,8 @@ export const pageCommand = new Command('page')
       .option('--title <title>', 'New title')
       .option('--icon <emoji>', 'Page icon emoji')
       .option('--pretty')
-      .action(updateAction)
+      .action(updateAction),
   )
   .addCommand(
-    new Command('archive')
-      .description('Archive a page')
-      .argument('<page_id>')
-      .option('--pretty')
-      .action(archiveAction)
+    new Command('archive').description('Archive a page').argument('<page_id>').option('--pretty').action(archiveAction),
   )

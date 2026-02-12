@@ -16,7 +16,7 @@ async function getAction(blockId: string, options: { pretty?: boolean }): Promis
 
 async function childrenAction(
   blockId: string,
-  options: { pretty?: boolean; pageSize?: string; startCursor?: string }
+  options: { pretty?: boolean; pageSize?: string; startCursor?: string },
 ): Promise<void> {
   try {
     const client = getClient()
@@ -30,10 +30,7 @@ async function childrenAction(
   }
 }
 
-async function appendAction(
-  parentId: string,
-  options: { pretty?: boolean; content: string }
-): Promise<void> {
+async function appendAction(parentId: string, options: { pretty?: boolean; content: string }): Promise<void> {
   try {
     const client = getClient()
     const children: BlockObjectRequest[] = JSON.parse(options.content)
@@ -44,10 +41,7 @@ async function appendAction(
   }
 }
 
-async function updateAction(
-  blockId: string,
-  options: { pretty?: boolean; content: string }
-): Promise<void> {
+async function updateAction(blockId: string, options: { pretty?: boolean; content: string }): Promise<void> {
   try {
     const client = getClient()
     const content = JSON.parse(options.content)
@@ -75,7 +69,7 @@ export const blockCommand = new Command('block')
       .description('Retrieve a block')
       .argument('<block_id>', 'Block ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('children')
@@ -84,7 +78,7 @@ export const blockCommand = new Command('block')
       .option('--page-size <n>', 'Number of results per page')
       .option('--start-cursor <cursor>', 'Pagination cursor')
       .option('--pretty', 'Pretty print JSON output')
-      .action(childrenAction)
+      .action(childrenAction),
   )
   .addCommand(
     new Command('append')
@@ -92,7 +86,7 @@ export const blockCommand = new Command('block')
       .argument('<parent_id>', 'Parent block ID')
       .requiredOption('--content <json>', 'Block children as JSON array')
       .option('--pretty', 'Pretty print JSON output')
-      .action(appendAction)
+      .action(appendAction),
   )
   .addCommand(
     new Command('update')
@@ -100,12 +94,12 @@ export const blockCommand = new Command('block')
       .argument('<block_id>', 'Block ID')
       .requiredOption('--content <json>', 'Block update content as JSON')
       .option('--pretty', 'Pretty print JSON output')
-      .action(updateAction)
+      .action(updateAction),
   )
   .addCommand(
     new Command('delete')
       .description('Delete (trash) a block')
       .argument('<block_id>', 'Block ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(deleteAction)
+      .action(deleteAction),
   )

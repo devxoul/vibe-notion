@@ -11,7 +11,7 @@ async function searchAction(
     pageSize?: number
     startCursor?: string
     pretty?: boolean
-  }
+  },
 ): Promise<void> {
   try {
     const client = getClient()

@@ -19,7 +19,7 @@ function createCookiesDb(dbPath: string, rows: Array<Record<string, unknown>>): 
   `)
 
   const insert = db.query(
-    'INSERT INTO cookies (name, value, encrypted_value, host_key, last_access_utc) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO cookies (name, value, encrypted_value, host_key, last_access_utc) VALUES (?, ?, ?, ?, ?)',
   )
 
   for (const row of rows) {
@@ -28,7 +28,7 @@ function createCookiesDb(dbPath: string, rows: Array<Record<string, unknown>>): 
       (row.value as string | null) ?? '',
       (row.encrypted_value as Uint8Array | null) ?? new Uint8Array(),
       row.host_key as string,
-      row.last_access_utc as number
+      row.last_access_utc as number,
     )
   }
 

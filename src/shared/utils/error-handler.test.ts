@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
-import { APIErrorCode, ClientErrorCode } from '@notionhq/client'
+import { APIErrorCode } from '@notionhq/client'
 import { handleError } from './error-handler'
 
 describe('handleError', () => {

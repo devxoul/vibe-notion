@@ -9,7 +9,7 @@ const mockUsersMe = mock(() =>
       owner: { type: 'workspace', workspace: true },
       workspace_name: 'Test Workspace',
     },
-  })
+  }),
 )
 
 mock.module('../client', () => ({
@@ -90,9 +90,7 @@ describe('auth status command', () => {
   test('exits with error when users.me fails (missing token)', async () => {
     // Given
     mockUsersMe.mockRejectedValue(
-      new Error(
-        'NOTION_TOKEN is required. Create an integration at https://www.notion.so/profile/integrations'
-      )
+      new Error('NOTION_TOKEN is required. Create an integration at https://www.notion.so/profile/integrations'),
     )
 
     // When

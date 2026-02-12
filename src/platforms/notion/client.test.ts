@@ -9,7 +9,7 @@ afterEach(() => {
 
 beforeEach(() => {
   mockFetch = mock((_url: string, _options: RequestInit) =>
-    Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }))
+    Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 })),
   )
   globalThis.fetch = mockFetch as any
 })
@@ -45,9 +45,7 @@ describe('internalRequest', () => {
   test('returns parsed JSON on success', async () => {
     // Given
     const responseData = { result: 'success', data: [1, 2, 3] }
-    mockFetch = mock(() =>
-      Promise.resolve(new Response(JSON.stringify(responseData), { status: 200 }))
-    )
+    mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify(responseData), { status: 200 })))
     globalThis.fetch = mockFetch as any
 
     // When
@@ -59,9 +57,7 @@ describe('internalRequest', () => {
 
   test('throws on non-ok response with status code in message', async () => {
     // Given
-    mockFetch = mock(() =>
-      Promise.resolve(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }))
-    )
+    mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })))
     globalThis.fetch = mockFetch as any
 
     // When/Then
@@ -88,9 +84,7 @@ describe('internalRequest', () => {
 
   test('throws on 500 status', async () => {
     // Given
-    mockFetch = mock(() =>
-      Promise.resolve(new Response(JSON.stringify({ error: 'Server error' }), { status: 500 }))
-    )
+    mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: 'Server error' }), { status: 500 })))
     globalThis.fetch = mockFetch as any
 
     // When/Then
@@ -99,9 +93,7 @@ describe('internalRequest', () => {
 
   test('throws on 401 status', async () => {
     // Given
-    mockFetch = mock(() =>
-      Promise.resolve(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }))
-    )
+    mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })))
     globalThis.fetch = mockFetch as any
 
     // When/Then

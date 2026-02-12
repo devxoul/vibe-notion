@@ -118,19 +118,8 @@ describe('database commands', () => {
 
       // When
       await databaseCommand.parseAsync(
-        [
-          'query',
-          'db-123',
-          '--filter',
-          filter,
-          '--sort',
-          sort,
-          '--page-size',
-          '10',
-          '--start-cursor',
-          'abc',
-        ],
-        { from: 'user' }
+        ['query', 'db-123', '--filter', filter, '--sort', sort, '--page-size', '10', '--start-cursor', 'abc'],
+        { from: 'user' },
       )
 
       // Then
@@ -177,7 +166,7 @@ describe('database commands', () => {
         ['create', '--parent', 'page-1', '--title', 'Tasks', '--properties', properties],
         {
           from: 'user',
-        }
+        },
       )
 
       // Then

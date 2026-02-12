@@ -1,7 +1,7 @@
 export async function internalRequest(
   tokenV2: string,
   endpoint: string,
-  body: Record<string, unknown> = {}
+  body: Record<string, unknown> = {},
 ): Promise<unknown> {
   const response = await fetch(`https://www.notion.so/api/v3/${endpoint}`, {
     method: 'POST',

@@ -123,7 +123,7 @@ describe('NotionClient', () => {
         expect.objectContaining({
           block_id: 'block-1',
           children: expect.arrayContaining([expect.any(Object)]),
-        })
+        }),
       )
     })
 

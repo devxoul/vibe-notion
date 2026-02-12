@@ -1,8 +1,5 @@
 import { Client } from '@notionhq/client'
-import type {
-  AppendBlockChildrenResponse,
-  BlockObjectRequest,
-} from '@notionhq/client/build/src/api-endpoints'
+import type { AppendBlockChildrenResponse, BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints'
 
 const BLOCK_CHUNK_SIZE = 100
 
@@ -11,9 +8,7 @@ export class NotionClient {
 
   constructor(token: string) {
     if (!token) {
-      throw new Error(
-        'NOTION_TOKEN is required. Create an integration at https://www.notion.so/profile/integrations'
-      )
+      throw new Error('NOTION_TOKEN is required. Create an integration at https://www.notion.so/profile/integrations')
     }
     this.sdk = new Client({ auth: token, notionVersion: '2022-06-28' })
   }
@@ -51,10 +46,7 @@ export class NotionClient {
     return this.sdk.comments
   }
 
-  async appendBlockChildren(
-    blockId: string,
-    children: BlockObjectRequest[]
-  ): Promise<AppendBlockChildrenResponse[]> {
+  async appendBlockChildren(blockId: string, children: BlockObjectRequest[]): Promise<AppendBlockChildrenResponse[]> {
     const results: AppendBlockChildrenResponse[] = []
 
     for (let i = 0; i < children.length; i += BLOCK_CHUNK_SIZE) {
@@ -73,9 +65,7 @@ export class NotionClient {
 export function getClient(): NotionClient {
   const token = process.env.NOTION_TOKEN
   if (!token) {
-    throw new Error(
-      'NOTION_TOKEN is required. Create an integration at https://www.notion.so/profile/integrations'
-    )
+    throw new Error('NOTION_TOKEN is required. Create an integration at https://www.notion.so/profile/integrations')
   }
   return new NotionClient(token)
 }

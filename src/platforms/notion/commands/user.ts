@@ -89,11 +89,7 @@ async function getAction(userId: string, options: CommandOptions): Promise<void>
 async function meAction(options: CommandOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
-    const response = (await internalRequest(
-      creds.token_v2,
-      'loadUserContent',
-      {}
-    )) as LoadUserContentResponse
+    const response = (await internalRequest(creds.token_v2, 'loadUserContent', {})) as LoadUserContentResponse
 
     const currentUser = Object.values(response.recordMap.notion_user ?? {})[0]?.value
     const spaces = Object.values(response.recordMap.space ?? {}).map((record) => {
@@ -124,18 +120,18 @@ export const userCommand = new Command('user')
     new Command('list')
       .description('List users in workspace')
       .option('--pretty', 'Pretty print JSON output')
-      .action(listAction)
+      .action(listAction),
   )
   .addCommand(
     new Command('get')
       .description('Retrieve a specific user')
       .argument('<user_id>', 'User ID')
       .option('--pretty', 'Pretty print JSON output')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('me')
       .description('Get current user info')
       .option('--pretty', 'Pretty print JSON output')
-      .action(meAction)
+      .action(meAction),
   )

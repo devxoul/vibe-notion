@@ -4,7 +4,7 @@ const mockBlockRetrieve = mock(() => Promise.resolve({ id: 'block-123', type: 'p
 const mockBlockUpdate = mock(() => Promise.resolve({ id: 'block-123', type: 'paragraph' }))
 const mockBlockDelete = mock(() => Promise.resolve({ id: 'block-123', archived: true }))
 const mockChildrenList = mock(() =>
-  Promise.resolve({ results: [{ id: 'child-1' }], has_more: false, next_cursor: null })
+  Promise.resolve({ results: [{ id: 'child-1' }], has_more: false, next_cursor: null }),
 )
 const mockAppendBlockChildren = mock(() => Promise.resolve([{ results: [] }]))
 
@@ -84,10 +84,9 @@ describe('block commands', () => {
     })
 
     // When
-    await blockCommand.parseAsync(
-      ['children', 'parent-123', '--page-size', '10', '--start-cursor', 'abc'],
-      { from: 'user' }
-    )
+    await blockCommand.parseAsync(['children', 'parent-123', '--page-size', '10', '--start-cursor', 'abc'], {
+      from: 'user',
+    })
 
     // Then
     expect(mockChildrenList).toHaveBeenCalledWith({
@@ -102,9 +101,7 @@ describe('block commands', () => {
 
   test('append sends block children to parent', async () => {
     // Given
-    const children = [
-      { type: 'paragraph', paragraph: { rich_text: [{ text: { content: 'hi' } }] } },
-    ]
+    const children = [{ type: 'paragraph', paragraph: { rich_text: [{ text: { content: 'hi' } }] } }]
     mockAppendBlockChildren.mockResolvedValue([{ results: children }])
 
     // When

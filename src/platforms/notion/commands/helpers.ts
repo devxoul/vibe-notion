@@ -30,10 +30,7 @@ export async function resolveSpaceId(tokenV2: string, blockId: string): Promise<
   return block.value.space_id
 }
 
-export async function resolveCollectionViewId(
-  tokenV2: string,
-  collectionId: string
-): Promise<string> {
+export async function resolveCollectionViewId(tokenV2: string, collectionId: string): Promise<string> {
   const collResult = (await internalRequest(tokenV2, 'syncRecordValues', {
     requests: [{ pointer: { table: 'collection', id: collectionId }, version: -1 }],
   })) as { recordMap: { collection: Record<string, { value: { parent_id: string } }> } }

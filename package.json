@@ -15,6 +15,7 @@
     "test": "bun test src/",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
+    "lint:fix": "biome check --write --unsafe .",
     "format": "biome format --write .",
     "prepublishOnly": "bun run build"
   },

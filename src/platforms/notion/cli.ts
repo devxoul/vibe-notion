@@ -2,21 +2,11 @@
 
 import { Command } from 'commander'
 import pkg from '../../../package.json'
-import {
-  authCommand,
-  blockCommand,
-  databaseCommand,
-  pageCommand,
-  searchCommand,
-  userCommand,
-} from './commands/index'
+import { authCommand, blockCommand, databaseCommand, pageCommand, searchCommand, userCommand } from './commands/index'
 
 const program = new Command()
 
-program
-  .name('agent-notion')
-  .description('Notion unofficial API CLI for AI agents')
-  .version(pkg.version)
+program.name('agent-notion').description('Notion unofficial API CLI for AI agents').version(pkg.version)
 
 program.addCommand(authCommand)
 program.addCommand(blockCommand)

@@ -169,11 +169,7 @@ async function queryAction(collectionId: string, options: QueryOptions): Promise
 async function listAction(options: CommandOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
-    const response = (await internalRequest(
-      creds.token_v2,
-      'loadUserContent',
-      {}
-    )) as LoadUserContentResponse
+    const response = (await internalRequest(creds.token_v2, 'loadUserContent', {})) as LoadUserContentResponse
 
     const output = Object.values(response.recordMap.collection ?? {}).map((record) => {
       const collection = record.value
@@ -340,7 +336,7 @@ export const databaseCommand = new Command('database')
       .description('Retrieve database schema')
       .argument('<collection_id>')
       .option('--pretty')
-      .action(getAction)
+      .action(getAction),
   )
   .addCommand(
     new Command('query')
@@ -351,11 +347,9 @@ export const databaseCommand = new Command('database')
       .option('--search-query <q>', 'Search within results')
       .option('--timezone <tz>', 'User timezone')
       .option('--pretty')
-      .action(queryAction)
+      .action(queryAction),
   )
-  .addCommand(
-    new Command('list').description('List all databases').option('--pretty').action(listAction)
-  )
+  .addCommand(new Command('list').description('List all databases').option('--pretty').action(listAction))
   .addCommand(
     new Command('create')
       .description('Create a database')
@@ -363,7 +357,7 @@ export const databaseCommand = new Command('database')
       .requiredOption('--title <title>', 'Database title')
       .option('--properties <json>', 'Schema properties as JSON')
       .option('--pretty')
-      .action(createAction)
+      .action(createAction),
   )
   .addCommand(
     new Command('update')
@@ -372,5 +366,5 @@ export const databaseCommand = new Command('database')
       .option('--title <title>', 'New title')
       .option('--properties <json>', 'Schema properties as JSON')
       .option('--pretty')
-      .action(updateAction)
+      .action(updateAction),
   )
