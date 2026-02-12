@@ -19,10 +19,12 @@
   },
   "dependencies": {
     "@notionhq/client": "latest",
+    "better-sqlite3": "latest",
     "commander": "latest"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",
+    "@types/better-sqlite3": "latest",
     "@types/bun": "latest",
     "@types/node": "latest",
     "typescript": "latest"
