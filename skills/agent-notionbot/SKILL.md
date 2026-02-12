@@ -68,6 +68,7 @@ agent-notionbot database get <database_id>
 # Query a database with optional filters and sorts
 agent-notionbot database query <database_id> --filter '{"property": "Status", "select": {"equals": "In Progress"}}'
 agent-notionbot database query <database_id> --sort '[{"property": "Created time", "direction": "descending"}]'
+agent-notionbot database query <database_id> --page-size 10 --start-cursor <cursor>
 
 # Create a database under a parent page
 agent-notionbot database create --parent <page_id> --title "My Database" --properties '{"Name": {"title": {}}}'
@@ -77,6 +78,7 @@ agent-notionbot database update <database_id> --title "Updated Title"
 
 # List all databases accessible by the integration
 agent-notionbot database list
+agent-notionbot database list --page-size 10 --start-cursor <cursor>
 ```
 
 ### Block Commands
@@ -87,7 +89,7 @@ agent-notionbot block get <block_id>
 
 # List direct children of a block (paginated)
 agent-notionbot block children <block_id>
-agent-notionbot block children <block_id> --page-size 50
+agent-notionbot block children <block_id> --page-size 50 --start-cursor <cursor>
 
 # Append child blocks to a parent
 agent-notionbot block append <parent_id> --content '[{"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "Hello World"}}]}}]'
@@ -104,6 +106,7 @@ agent-notionbot block delete <block_id>
 ```bash
 # List all users in the workspace
 agent-notionbot user list
+agent-notionbot user list --page-size 10 --start-cursor <cursor>
 
 # Get info for a specific user
 agent-notionbot user get <user_id>
@@ -124,6 +127,9 @@ agent-notionbot search "Tasks" --filter database
 
 # Sort search results
 agent-notionbot search "Meeting" --sort desc
+
+# Paginate search results
+agent-notionbot search "Notes" --page-size 10 --start-cursor <cursor>
 ```
 
 ### Comment Commands
@@ -131,6 +137,7 @@ agent-notionbot search "Meeting" --sort desc
 ```bash
 # List comments on a page
 agent-notionbot comment list --page <page_id>
+agent-notionbot comment list --page <page_id> --page-size 10 --start-cursor <cursor>
 
 # Create a comment on a page
 agent-notionbot comment create "This is a comment" --page <page_id>
@@ -163,18 +170,6 @@ Use `--pretty` flag for formatted output:
 ```bash
 agent-notionbot search "Project" --pretty
 ```
-
-## Common Patterns
-
-See `references/common-patterns.md` for typical AI agent workflows.
-
-## Templates
-
-See `templates/` directory for runnable examples:
-- `read-page.sh` - Read page content recursively
-- `query-database.sh` - Query database and process results
-- `create-page.sh` - Create page with content
-- `workspace-overview.sh` - Get workspace summary
 
 ## Error Handling
 

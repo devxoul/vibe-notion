@@ -91,6 +91,7 @@ agent-notion database query <collection_id> --pretty
 agent-notion database query <collection_id> --limit 10 --pretty
 agent-notion database query <collection_id> --view-id <view_id> --pretty
 agent-notion database query <collection_id> --search-query "keyword" --pretty
+agent-notion database query <collection_id> --timezone "America/New_York" --pretty
 
 # List all databases in workspace
 agent-notion database list --pretty
