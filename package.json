@@ -13,6 +13,7 @@
     "build": "tsc",
     "postbuild": "bun scripts/postbuild.ts",
     "test": "bun test src/",
+    "test:e2e": "bun test e2e/",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write --unsafe .",
