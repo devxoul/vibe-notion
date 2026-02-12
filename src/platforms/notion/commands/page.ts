@@ -3,6 +3,7 @@ import { formatOutput } from '../../../shared/utils/output'
 import { internalRequest } from '../client'
 import { type CommandOptions, generateId, getCredentialsOrExit, resolveSpaceId } from './helpers'
 
+type ListPageOptions = CommandOptions & { spaceId?: string; depth?: string }
 type LoadPageChunkOptions = CommandOptions & { limit?: string }
 type CreatePageOptions = CommandOptions & { parent: string; title: string }
 type UpdatePageOptions = CommandOptions & { title?: string; icon?: string }
@@ -46,6 +47,116 @@ type BlockOperation = {
 
 function pickBlock(response: SyncRecordValuesResponse, blockId: string): BlockRecord | undefined {
   return response.recordMap.block[blockId] ?? Object.values(response.recordMap.block)[0]
+}
+
+type SpaceRecord = {
+  value: {
+    id: string
+    name?: string
+    pages?: string[]
+    [key: string]: unknown
+  }
+}
+
+type GetSpacesResponse = Record<string, { space: Record<string, SpaceRecord> }>
+
+type PageEntry = {
+  id: string
+  title: string
+  type: string
+  children?: PageEntry[]
+}
+
+async function getDefaultSpace(
+  tokenV2: string,
+  spaceId?: string
+): Promise<{ id: string; pages: string[] }> {
+  const spacesData = (await internalRequest(tokenV2, 'getSpaces', {})) as GetSpacesResponse
+  const allSpaces = Object.values(spacesData).flatMap((entry) => Object.values(entry.space ?? {}))
+
+  const space = spaceId ? allSpaces.find((s) => s.value.id === spaceId) : allSpaces[0]
+
+  if (!space) {
+    throw new Error(spaceId ? `Space not found: ${spaceId}` : 'No spaces found')
+  }
+
+  return { id: space.value.id, pages: space.value.pages ?? [] }
+}
+
+function extractTitle(block: BlockValue): string {
+  const title = block.properties as { title?: string[][] } | undefined
+  if (title?.title) {
+    return title.title.map((segment: string[]) => segment[0]).join('')
+  }
+  return ''
+}
+
+async function walkPages(
+  tokenV2: string,
+  pageIds: string[],
+  maxDepth: number,
+  currentDepth: number
+): Promise<PageEntry[]> {
+  if (pageIds.length === 0) return []
+
+  const response = (await internalRequest(tokenV2, 'syncRecordValues', {
+    requests: pageIds.map((id) => ({ pointer: { table: 'block', id }, version: -1 })),
+  })) as SyncRecordValuesResponse
+
+  const entries: PageEntry[] = []
+
+  for (const pageId of pageIds) {
+    const record = response.recordMap.block[pageId]
+    if (!record?.value) continue
+
+    const block = record.value
+    const type = (block.type as string) ?? 'unknown'
+    const isPage = type === 'page' || type === 'collection_view_page' || type === 'collection_view'
+
+    if (!isPage) continue
+    if ((block.alive as boolean | undefined) === false) continue
+
+    const entry: PageEntry = {
+      id: pageId,
+      title: extractTitle(block),
+      type,
+    }
+
+    if (currentDepth < maxDepth) {
+      const childIds = (block.content as string[] | undefined) ?? []
+      if (childIds.length > 0) {
+        const children = await walkPages(tokenV2, childIds, maxDepth, currentDepth + 1)
+        if (children.length > 0) {
+          entry.children = children
+        }
+      }
+    }
+
+    entries.push(entry)
+  }
+
+  return entries
+}
+
+async function listAction(options: ListPageOptions): Promise<void> {
+  try {
+    const creds = await getCredentialsOrExit()
+    const space = await getDefaultSpace(creds.token_v2, options.spaceId)
+    const maxDepth = options.depth ? Number(options.depth) : 1
+
+    const pages = await walkPages(creds.token_v2, space.pages, maxDepth, 0)
+
+    const output = {
+      spaceId: space.id,
+      pages,
+      total: pages.length,
+    }
+
+    console.log(formatOutput(output, options.pretty))
+  } catch (error) {
+    console.error(JSON.stringify({ error: (error as Error).message }))
+    process.exit(1)
+  }
 }
 
 async function getAction(pageId: string, options: LoadPageChunkOptions): Promise<void> {
@@ -222,6 +333,14 @@ async function archiveAction(pageId: string, options: CommandOptions): Promise<v
 
 export const pageCommand = new Command('page')
   .description('Page commands')
+  .addCommand(
+    new Command('list')
+      .description('List pages in a space')
+      .option('--space-id <id>', 'Space ID (defaults to first space)')
+      .option('--depth <n>', 'Recursion depth (default: 1)', '1')
+      .option('--pretty', 'Pretty print JSON output')
+      .action(listAction)
+  )
   .addCommand(
     new Command('get')
       .description('Retrieve a page and its content')
