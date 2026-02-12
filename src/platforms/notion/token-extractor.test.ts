@@ -178,4 +178,151 @@ describe('TokenExtractor', () => {
     const expected = pbkdf2Sync('peanuts', 'saltysalt', 1, 16, 'sha1')
     expect(key).toEqual(expected)
   })
+
+  test('extract returns user_ids from notion_users cookie with plain JSON', async () => {
+    const notionDir = mkdtempSync(join(tmpdir(), 'notion-multi-'))
+    tempDirs.push(notionDir)
+
+    const partitionDir = join(notionDir, 'Partitions', 'notion')
+    mkdirSync(partitionDir, { recursive: true })
+    const dbPath = join(partitionDir, 'Cookies')
+
+    createCookiesDb(dbPath, [
+      {
+        name: 'token_v2',
+        value: 'v02%3Atest-token',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 3,
+      },
+      {
+        name: 'notion_user_id',
+        value: 'user-aaa',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 2,
+      },
+      {
+        name: 'notion_users',
+        value: '["user-aaa","user-bbb"]',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 1,
+      },
+    ])
+
+    const extractor = new TokenExtractor('darwin', notionDir)
+    const extracted = await extractor.extract()
+
+    expect(extracted).toEqual({
+      token_v2: 'v02%3Atest-token',
+      user_id: 'user-aaa',
+      user_ids: ['user-aaa', 'user-bbb'],
+    })
+  })
+
+  test('extract omits user_ids when notion_users cookie is missing', async () => {
+    const notionDir = mkdtempSync(join(tmpdir(), 'notion-single-'))
+    tempDirs.push(notionDir)
+
+    const partitionDir = join(notionDir, 'Partitions', 'notion')
+    mkdirSync(partitionDir, { recursive: true })
+    const dbPath = join(partitionDir, 'Cookies')
+
+    createCookiesDb(dbPath, [
+      {
+        name: 'token_v2',
+        value: 'v02%3Atest-token',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 2,
+      },
+    ])
+
+    const extractor = new TokenExtractor('darwin', notionDir)
+    const extracted = await extractor.extract()
+
+    expect(extracted).toEqual({ token_v2: 'v02%3Atest-token' })
+    expect(extracted?.user_ids).toBeUndefined()
+  })
+
+  test('extract parses user_ids from encrypted notion_users cookie with padding prefix', async () => {
+    // given — encrypted v10 cookie where decrypted value has garbage prefix before JSON
+    class TestTokenExtractor extends TokenExtractor {
+      override getDerivedKey(): Buffer {
+        return Buffer.from('1234567890abcdef')
+      }
+    }
+
+    const notionDir = mkdtempSync(join(tmpdir(), 'notion-enc-multi-'))
+    tempDirs.push(notionDir)
+
+    const partitionDir = join(notionDir, 'Partitions', 'notion')
+    mkdirSync(partitionDir, { recursive: true })
+    const dbPath = join(partitionDir, 'Cookies')
+
+    const key = Buffer.from('1234567890abcdef')
+    const iv = Buffer.alloc(16, ' ')
+
+    // Encrypt notion_users value with garbage prefix (simulates real cookie padding)
+    const usersPlaintext = 'GARBAGE_PREFIX["user-111","user-222"]'
+    const usersCipher = createCipheriv('aes-128-cbc', key, iv)
+    const usersCiphertext = Buffer.concat([usersCipher.update(usersPlaintext, 'utf8'), usersCipher.final()])
+    const usersEncrypted = Buffer.concat([Buffer.from('v10'), usersCiphertext])
+
+    createCookiesDb(dbPath, [
+      {
+        name: 'token_v2',
+        value: 'v02%3Atest-token',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 3,
+      },
+      {
+        name: 'notion_users',
+        value: '',
+        encrypted_value: new Uint8Array(usersEncrypted),
+        host_key: '.notion.so',
+        last_access_utc: 1,
+      },
+    ])
+
+    const extractor = new TestTokenExtractor('darwin', notionDir)
+    const extracted = await extractor.extract()
+
+    expect(extracted?.token_v2).toBe('v02%3Atest-token')
+    expect(extracted?.user_ids).toEqual(['user-111', 'user-222'])
+  })
+
+  test('extract returns empty user_ids for non-array notion_users cookie', async () => {
+    const notionDir = mkdtempSync(join(tmpdir(), 'notion-bad-users-'))
+    tempDirs.push(notionDir)
+
+    const partitionDir = join(notionDir, 'Partitions', 'notion')
+    mkdirSync(partitionDir, { recursive: true })
+    const dbPath = join(partitionDir, 'Cookies')
+
+    createCookiesDb(dbPath, [
+      {
+        name: 'token_v2',
+        value: 'v02%3Atest-token',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 2,
+      },
+      {
+        name: 'notion_users',
+        value: 'not-valid-json',
+        encrypted_value: new Uint8Array(),
+        host_key: '.notion.so',
+        last_access_utc: 1,
+      },
+    ])
+
+    const extractor = new TokenExtractor('darwin', notionDir)
+    const extracted = await extractor.extract()
+
+    expect(extracted).toEqual({ token_v2: 'v02%3Atest-token' })
+    expect(extracted?.user_ids).toBeUndefined()
+  })
 })

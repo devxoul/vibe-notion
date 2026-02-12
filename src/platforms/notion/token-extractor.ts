@@ -16,6 +16,7 @@ type CookieRow = {
 export interface ExtractedToken {
   token_v2: string
   user_id?: string
+  user_ids?: string[]
 }
 
 export class TokenExtractor {
@@ -77,7 +78,7 @@ export class TokenExtractor {
 
       // Extract token from decrypted data (may have padding/garbage before it)
       const match = decrypted.match(/v\d+(%3A|:)[A-Za-z0-9_.%-]+/)
-      return match ? match[0] : null
+      return match ? match[0] : decrypted
     } catch {
       return null
     }
@@ -147,21 +148,25 @@ export class TokenExtractor {
     try {
       const tokenSql = `SELECT name, value, encrypted_value FROM cookies WHERE name = 'token_v2' AND host_key LIKE '%notion%' ORDER BY last_access_utc DESC LIMIT 1`
       const userSql = `SELECT name, value, encrypted_value FROM cookies WHERE name = 'notion_user_id' AND host_key LIKE '%notion%' ORDER BY last_access_utc DESC LIMIT 1`
+      const usersSql = `SELECT name, value, encrypted_value FROM cookies WHERE name = 'notion_users' AND host_key LIKE '%notion%' ORDER BY last_access_utc DESC LIMIT 1`
 
       let tokenRow: CookieRow
       let userRow: CookieRow
+      let usersRow: CookieRow
 
       if (typeof globalThis.Bun !== 'undefined') {
         const { Database } = require('bun:sqlite')
         const db = new Database(tempDbPath, { readonly: true })
         tokenRow = db.query(tokenSql).get() as CookieRow
         userRow = db.query(userSql).get() as CookieRow
+        usersRow = db.query(usersSql).get() as CookieRow
         db.close()
       } else {
         const Database = require('better-sqlite3')
         const db = new Database(tempDbPath, { readonly: true })
         tokenRow = db.prepare(tokenSql).get() as CookieRow
         userRow = db.prepare(userSql).get() as CookieRow
+        usersRow = db.prepare(usersSql).get() as CookieRow
         db.close()
       }
 
@@ -171,11 +176,13 @@ export class TokenExtractor {
       }
 
       const userId = this.resolveCookieValue(userRow)
-      if (userId) {
-        return { token_v2: token, user_id: userId }
-      }
+      const userIds = this.parseUserIds(usersRow)
 
-      return { token_v2: token }
+      return {
+        token_v2: token,
+        ...(userId ? { user_id: userId } : {}),
+        ...(userIds.length > 0 ? { user_ids: userIds } : {}),
+      }
     } catch {
       return null
     } finally {
@@ -183,6 +190,31 @@ export class TokenExtractor {
         rmSync(tempDbPath, { force: true })
       } catch {}
     }
+  }
+
+  private parseUserIds(row: CookieRow): string[] {
+    const raw = this.resolveCookieValue(row)
+    if (!raw) return []
+
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
+        return parsed
+      }
+    } catch {
+      // Not valid JSON — try extracting JSON array from decrypted value (may have padding prefix)
+      const match = raw.match(/\[.*\]/)
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]) as unknown
+          if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
+            return parsed
+          }
+        } catch {}
+      }
+    }
+
+    return []
   }
 
   private resolveCookieValue(row: CookieRow): string | null {
