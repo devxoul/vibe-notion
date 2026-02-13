@@ -99,10 +99,62 @@ describe('formatBlockValue', () => {
       text: 'Hello world',
       content: ['child-1', 'child-2'],
       parent_id: 'parent-1',
+      collection_id: undefined,
+      view_ids: undefined,
     })
     expect('version' in result).toBe(false)
     expect('space_id' in result).toBe(false)
     expect('created_time' in result).toBe(false)
+  })
+
+  test('includes collection_id and view_ids for collection_view blocks', () => {
+    // Given
+    const block = {
+      id: 'block-collection-view',
+      type: 'collection_view',
+      collection_id: 'coll-123',
+      view_ids: ['view-1', 'view-2'],
+      parent_id: 'parent-1',
+    }
+
+    // When
+    const result = formatBlockValue(block)
+
+    // Then
+    expect(result).toEqual({
+      id: 'block-collection-view',
+      type: 'collection_view',
+      text: '',
+      content: undefined,
+      parent_id: 'parent-1',
+      collection_id: 'coll-123',
+      view_ids: ['view-1', 'view-2'],
+    })
+  })
+
+  test('includes collection_id and view_ids for collection_view_page blocks', () => {
+    // Given
+    const block = {
+      id: 'block-collection-view-page',
+      type: 'collection_view_page',
+      collection_id: 'coll-456',
+      view_ids: ['view-3'],
+      parent_id: 'parent-2',
+    }
+
+    // When
+    const result = formatBlockValue(block)
+
+    // Then
+    expect(result).toEqual({
+      id: 'block-collection-view-page',
+      type: 'collection_view_page',
+      text: '',
+      content: undefined,
+      parent_id: 'parent-2',
+      collection_id: 'coll-456',
+      view_ids: ['view-3'],
+    })
   })
 })
 
@@ -339,7 +391,7 @@ describe('formatCollectionValue', () => {
 })
 
 describe('formatQueryCollectionResponse', () => {
-  test('formats query response rows and has_more flag', () => {
+  test('formats query response rows with schema property names', () => {
     // Given
     const response = {
       result: {
@@ -356,7 +408,23 @@ describe('formatQueryCollectionResponse', () => {
             value: {
               id: 'row-1',
               type: 'page',
-              properties: { title: [['Row text']] },
+              properties: {
+                '@lzG': [['고래몰']],
+                'Ho]U': [['완료']],
+                SdrK: [['위젯 설치']],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                '@lzG': { name: '고객사', type: 'title' },
+                'Ho]U': { name: '상태', type: 'status' },
+                SdrK: { name: '타입', type: 'text' },
+              },
             },
           },
         },
@@ -368,7 +436,166 @@ describe('formatQueryCollectionResponse', () => {
 
     // Then
     expect(result).toEqual({
-      results: [{ id: 'row-1', type: 'page', text: 'Row text' }],
+      results: [
+        {
+          id: 'row-1',
+          properties: {
+            고객사: '고래몰',
+            상태: '완료',
+            타입: '위젯 설치',
+          },
+        },
+      ],
+      has_more: false,
+    })
+  })
+
+  test('extracts decorator-based values for person, relation, and date', () => {
+    // Given
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: {
+            blockIds: ['row-1'],
+            hasMore: false,
+          },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              properties: {
+                personKey: [['‣', [['u', 'user-123']]]],
+                relationKey: [['‣', [['p', 'page-456']]]],
+                dateKey: [['‣', [['d', { start_date: '2026-01-01' }]]]],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                personKey: { name: '담당자', type: 'person' },
+                relationKey: { name: '연결', type: 'relation' },
+                dateKey: { name: '일자', type: 'date' },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    expect(result).toEqual({
+      results: [
+        {
+          id: 'row-1',
+          properties: {
+            담당자: 'user-123',
+            연결: 'page-456',
+            일자: '2026-01-01',
+          },
+        },
+      ],
+      has_more: false,
+    })
+  })
+
+  test('handles new spaceId wrapping format from queryCollection', () => {
+    // Given - new format: { spaceId, value: { value, role } }
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: {
+            blockIds: ['row-1'],
+            hasMore: true,
+          },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            spaceId: 'space-1',
+            value: {
+              value: {
+                id: 'row-1',
+                type: 'page',
+                properties: {
+                  title: [['My Row']],
+                },
+              },
+              role: 'editor',
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            spaceId: 'space-1',
+            value: {
+              value: {
+                id: 'coll-1',
+                schema: {
+                  title: { name: 'Name', type: 'title' },
+                },
+              },
+              role: 'editor',
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    expect(result).toEqual({
+      results: [{ id: 'row-1', properties: { Name: 'My Row' } }],
+      has_more: true,
+    })
+  })
+
+  test('returns empty properties when block has no properties', () => {
+    // Given
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: {
+            blockIds: ['row-1'],
+            hasMore: false,
+          },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            value: { id: 'row-1', type: 'page' },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: { title: { name: 'Name', type: 'title' } },
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    expect(result).toEqual({
+      results: [{ id: 'row-1', properties: {} }],
       has_more: false,
     })
   })

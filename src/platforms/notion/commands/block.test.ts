@@ -127,6 +127,67 @@ describe('blockCommand', () => {
       const errorMsg = JSON.parse(errors[0])
       expect(errorMsg.error).toContain('Block not found')
     })
+
+    test('includes collection_id for collection_view block', async () => {
+      // Given
+      const mockInternalRequest = mock((_token: string, endpoint: string) => {
+        if (endpoint === 'syncRecordValues') {
+          return Promise.resolve({
+            recordMap: {
+              block: {
+                'block-123': {
+                  value: {
+                    id: 'block-123',
+                    type: 'collection_view',
+                    collection_id: 'coll-123',
+                    parent_id: 'parent-1',
+                    view_ids: ['view-1'],
+                  },
+                  role: 'editor',
+                },
+              },
+            },
+          })
+        }
+        return Promise.resolve({})
+      })
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'mock-uuid')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const output: string[] = []
+      const originalLog = console.log
+      console.log = (msg: string) => output.push(msg)
+
+      try {
+        // When
+        await blockCommand.parseAsync(['get', 'block-123', '--workspace-id', 'space-123'], { from: 'user' })
+      } catch {
+        // Expected to exit
+      }
+
+      console.log = originalLog
+
+      // Then
+      expect(output.length).toBeGreaterThan(0)
+      const result = JSON.parse(output[0])
+      expect(result.id).toBe('block-123')
+      expect(result.type).toBe('collection_view')
+      expect(result.collection_id).toBe('coll-123')
+    })
   })
 
   describe('block children', () => {
