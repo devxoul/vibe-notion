@@ -23,7 +23,10 @@
   "dependencies": {
     "@notionhq/client": "latest",
     "better-sqlite3": "latest",
-    "commander": "latest"
+    "commander": "latest",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",
