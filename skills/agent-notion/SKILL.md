@@ -72,6 +72,7 @@ agent-notion page list --workspace-id <workspace_id> --depth 2 --pretty
 # Get a page and all its content blocks
 agent-notion page get <page_id> --workspace-id <workspace_id> --pretty
 agent-notion page get <page_id> --workspace-id <workspace_id> --limit 50
+agent-notion page get <page_id> --workspace-id <workspace_id> --backlinks --pretty
 
 # Create a new page under a parent
 agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Page" --pretty
@@ -113,6 +114,7 @@ agent-notion database update <collection_id> --workspace-id <workspace_id> --tit
 ```bash
 # Get a specific block
 agent-notion block get <block_id> --workspace-id <workspace_id> --pretty
+agent-notion block get <block_id> --workspace-id <workspace_id> --backlinks --pretty
 
 # List child blocks
 agent-notion block children <block_id> --workspace-id <workspace_id> --pretty
@@ -187,6 +189,37 @@ agent-notion database query <collection_id> --workspace-id <workspace_id>
     }
   ],
   "has_more": false
+}
+```
+
+```bash
+# Page get — returns page metadata with content blocks
+agent-notion page get <page_id> --workspace-id <workspace_id>
+```
+```json
+{
+  "id": "page-uuid",
+  "title": "My Page",
+  "blocks": [
+    { "id": "block-1", "type": "text", "text": "Hello world" },
+    { "id": "block-2", "type": "to_do", "text": "Task item" }
+  ]
+}
+```
+
+```bash
+# With --backlinks: includes pages that link to this page/block
+agent-notion page get <page_id> --workspace-id <workspace_id> --backlinks
+agent-notion block get <block_id> --workspace-id <workspace_id> --backlinks
+```
+```json
+{
+  "id": "page-uuid",
+  "title": "My Page",
+  "blocks": [...],
+  "backlinks": [
+    { "id": "linking-page-uuid", "title": "Page That Links Here" }
+  ]
 }
 ```
 
