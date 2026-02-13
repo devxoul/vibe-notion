@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { formatOutput } from '../../../shared/utils/output'
 import { internalRequest } from '../client'
+import { formatUserValue } from '../formatters'
 import { type CommandOptions, getCredentialsOrExit, resolveAndSetActiveUserId } from './helpers'
 
 type UserGetOptions = CommandOptions & { workspaceId: string }
@@ -51,7 +52,7 @@ async function getAction(userId: string, options: UserGetOptions): Promise<void>
 
     const user = Object.values(response.recordMap.notion_user ?? {})[0]?.value
 
-    console.log(formatOutput(user, options.pretty))
+    console.log(formatOutput(formatUserValue(user as Record<string, unknown>), options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)

@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { formatOutput } from '../../../shared/utils/output'
 import { internalRequest } from '../client'
+import { formatBlockChildren, formatBlockValue } from '../formatters'
 import {
   type CommandOptions,
   generateId,
@@ -152,7 +153,7 @@ async function getAction(blockId: string, options: WorkspaceOptions): Promise<vo
     })) as SyncRecordValuesResponse
 
     const block = assertBlock(getBlockById(response.recordMap.block, blockId), blockId)
-    console.log(formatOutput(block, options.pretty))
+    console.log(formatOutput(formatBlockValue(block as Record<string, unknown>), options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: getErrorMessage(error) }))
     process.exit(1)
@@ -177,10 +178,7 @@ async function childrenAction(blockId: string, options: ChildListOptions): Promi
       .map((childId) => getBlockById(response.recordMap.block, childId))
       .filter((block): block is BlockValue => block !== undefined)
 
-    const output = {
-      results: childBlocks,
-      has_more: response.cursor.stack.length > 0,
-    }
+    const output = formatBlockChildren(childBlocks as Array<Record<string, unknown>>, response.cursor.stack.length > 0)
 
     console.log(formatOutput(output, options.pretty))
   } catch (error) {
@@ -276,7 +274,7 @@ async function updateAction(blockId: string, options: UpdateOptions): Promise<vo
     })) as SyncRecordValuesResponse
     const updatedBlock = assertBlock(getBlockById(verifyResponse.recordMap.block, blockId), blockId)
 
-    console.log(formatOutput(updatedBlock, options.pretty))
+    console.log(formatOutput(formatBlockValue(updatedBlock as Record<string, unknown>), options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: getErrorMessage(error) }))
     process.exit(1)

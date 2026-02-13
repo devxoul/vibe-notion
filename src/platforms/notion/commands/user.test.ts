@@ -67,7 +67,6 @@ describe('UserCommand', () => {
     expect(result.id).toBe('user-id-123')
     expect(result.name).toBe('Charlie')
     expect(result.email).toBe('charlie@example.com')
-    expect(result.profile_photo).toBe('https://example.com/photo.jpg')
   })
 
   test('user me returns current user with spaces from getSpaces', async () => {

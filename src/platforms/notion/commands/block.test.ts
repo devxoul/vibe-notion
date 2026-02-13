@@ -69,6 +69,8 @@ describe('blockCommand', () => {
       const result = JSON.parse(output[0])
       expect(result.id).toBe('block-123')
       expect(result.type).toBe('text')
+      expect(result.text).toBeDefined()
+      expect(result.parent_id).toBe('parent-1')
     })
 
     test('errors when block not found', async () => {
@@ -556,7 +558,8 @@ describe('blockCommand', () => {
       expect(output.length).toBeGreaterThan(0)
       const result = JSON.parse(output[0])
       expect(result.id).toBe('block-123')
-      expect(result.properties.title).toEqual([['Updated']])
+      expect(result.type).toBe('text')
+      expect(result.text).toBe('Updated')
     })
 
     test('calls saveTransactions then syncRecordValues to verify', async () => {
