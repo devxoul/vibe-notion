@@ -1,6 +1,6 @@
 ---
 name: agent-notion
-description: Interact with Notion using the unofficial private API - pages, databases, blocks, search, users
+description: Interact with Notion using the unofficial private API - pages, databases, blocks, search, users, comments
 allowed-tools: Bash(agent-notion:*)
 ---
 
@@ -129,6 +129,22 @@ agent-notion block update <block_id> --workspace-id <workspace_id> --content '{"
 
 # Delete a block
 agent-notion block delete <block_id> --workspace-id <workspace_id> --pretty
+```
+
+### Comment Commands
+
+```bash
+# List comments on a page
+agent-notion comment list --page <page_id> --workspace-id <workspace_id> --pretty
+
+# Create a comment on a page (starts a new discussion)
+agent-notion comment create "This is a comment" --page <page_id> --workspace-id <workspace_id> --pretty
+
+# Reply to an existing discussion thread
+agent-notion comment create "Replying to thread" --discussion <discussion_id> --workspace-id <workspace_id> --pretty
+
+# Get a specific comment by ID
+agent-notion comment get <comment_id> --workspace-id <workspace_id> --pretty
 ```
 
 ### Search Command
@@ -285,5 +301,4 @@ Commands that return lists support pagination via `has_more`, `next_cursor` fiel
 
 - `auth extract` supports macOS and Linux. Windows DPAPI decryption is not yet supported.
 - `token_v2` uses the unofficial internal API and may break if Notion changes it.
-- Comment operations are not yet supported (Notion's private comment API is opaque).
 - This is a private/unofficial API and is not supported by Notion.
