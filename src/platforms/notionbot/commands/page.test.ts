@@ -5,6 +5,8 @@ const mockPageCreate = mock(() => Promise.resolve({}))
 const mockPageUpdate = mock(() => Promise.resolve({}))
 const mockPagePropertyRetrieve = mock(() => Promise.resolve({}))
 const mockAppendBlockChildren = mock(() => Promise.resolve([{ results: [] }] as any))
+const mockBlockChildrenList = mock(() => Promise.resolve({ results: [], has_more: false, next_cursor: null }))
+const mockBlockDelete = mock(() => Promise.resolve({}))
 
 mock.module('../client', () => ({
   getClient: () => ({
@@ -13,6 +15,10 @@ mock.module('../client', () => ({
       create: mockPageCreate,
       update: mockPageUpdate,
       properties: { retrieve: mockPagePropertyRetrieve },
+    },
+    blocks: {
+      children: { list: mockBlockChildrenList },
+      delete: mockBlockDelete,
     },
     appendBlockChildren: mockAppendBlockChildren,
   }),
@@ -45,6 +51,8 @@ describe('page commands', () => {
     mockPageUpdate.mockReset()
     mockPagePropertyRetrieve.mockReset()
     mockAppendBlockChildren.mockReset()
+    mockBlockChildrenList.mockReset()
+    mockBlockDelete.mockReset()
   })
 
   afterEach(() => {
@@ -206,6 +214,15 @@ describe('page commands', () => {
         parent: { type: 'page_id', page_id: 'parent-1' },
         properties: {},
       })
+      mockPageRetrieve.mockResolvedValue({
+        id: 'page-123',
+        object: 'page',
+        url: 'https://notion.so/page-123',
+        archived: false,
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        properties: {},
+      })
 
       // When
       await pageCommand.parseAsync(['update', 'page-123', '--set', 'Status=Done'], {
@@ -234,6 +251,15 @@ describe('page commands', () => {
         parent: { type: 'page_id', page_id: 'parent-1' },
         properties: {},
       })
+      mockPageRetrieve.mockResolvedValue({
+        id: 'page-123',
+        object: 'page',
+        url: 'https://notion.so/page-123',
+        archived: false,
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        properties: {},
+      })
 
       // When
       await pageCommand.parseAsync(['update', 'page-123', '--set', 'Status=Done', '--set', 'Priority=High'], {
@@ -248,6 +274,75 @@ describe('page commands', () => {
           Priority: 'High',
         },
       })
+    })
+
+    test('replace-content deletes old blocks and appends new markdown', async () => {
+      // Given
+      mockBlockChildrenList.mockResolvedValue({
+        results: [{ id: 'old-block-1' }, { id: 'old-block-2' }],
+        has_more: false,
+        next_cursor: null,
+      } as any)
+      mockBlockDelete.mockResolvedValue({})
+      mockAppendBlockChildren.mockResolvedValue([{ results: [] }] as any)
+      mockPageRetrieve.mockResolvedValue({
+        id: 'page-123',
+        object: 'page',
+        url: 'https://notion.so/page-123',
+        archived: false,
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        properties: {
+          Name: { id: 'title', type: 'title', title: [{ plain_text: 'Test Page' }] },
+        },
+      })
+
+      // When
+      await pageCommand.parseAsync(['update', 'page-123', '--replace-content', '--markdown', '# New Content'], {
+        from: 'user',
+      })
+
+      // Then
+      expect(mockBlockChildrenList).toHaveBeenCalled()
+      expect(mockBlockDelete).toHaveBeenCalledTimes(2)
+      expect(mockBlockDelete).toHaveBeenCalledWith({ block_id: 'old-block-1' })
+      expect(mockBlockDelete).toHaveBeenCalledWith({ block_id: 'old-block-2' })
+      expect(mockAppendBlockChildren).toHaveBeenCalled()
+      const output = JSON.parse(consoleOutput[0])
+      expect(output.id).toBe('page-123')
+    })
+
+    test('replace-content without --markdown errors', async () => {
+      // When
+      try {
+        await pageCommand.parseAsync(['update', 'page-123', '--replace-content'], { from: 'user' })
+      } catch {}
+
+      // Then
+      const allOutput = [...consoleOutput, ...consoleErrors].join('\n')
+      expect(allOutput).toContain('--replace-content requires --markdown or --markdown-file')
+    })
+
+    test('append failure after delete shows clear error', async () => {
+      // Given
+      mockBlockChildrenList.mockResolvedValue({
+        results: [{ id: 'old-block-1' }],
+        has_more: false,
+        next_cursor: null,
+      } as any)
+      mockBlockDelete.mockResolvedValue({})
+      mockAppendBlockChildren.mockRejectedValue(new Error('API rate limit'))
+
+      // When
+      try {
+        await pageCommand.parseAsync(['update', 'page-123', '--replace-content', '--markdown', '# New Content'], {
+          from: 'user',
+        })
+      } catch {}
+
+      // Then
+      const allOutput = [...consoleOutput, ...consoleErrors].join('\n')
+      expect(allOutput).toContain('Page content cleared but new content failed to append')
     })
   })
 

@@ -64,15 +64,61 @@ function parsePropertyPair(value: string, previous: Record<string, string>): Rec
 
 async function updateAction(
   rawPageId: string,
-  options: { set: Record<string, string>; pretty?: boolean },
+  options: {
+    set: Record<string, string>
+    replaceContent?: boolean
+    markdown?: string
+    markdownFile?: string
+    pretty?: boolean
+  },
 ): Promise<void> {
   const pageId = formatNotionId(rawPageId)
   try {
     const client = getClient()
-    const page = await client.pages.update({
-      page_id: pageId,
-      properties: options.set as any,
-    })
+    const hasPropertyUpdates = Object.keys(options.set).length > 0
+
+    if (!hasPropertyUpdates && !options.replaceContent) {
+      throw new Error('No updates provided. Use --set or --replace-content with --markdown')
+    }
+
+    if (hasPropertyUpdates) {
+      await client.pages.update({
+        page_id: pageId,
+        properties: options.set as any,
+      })
+    }
+
+    if (options.replaceContent) {
+      if (!options.markdown && !options.markdownFile) {
+        throw new Error('--replace-content requires --markdown or --markdown-file')
+      }
+
+      const md = readMarkdownInput({ markdown: options.markdown, markdownFile: options.markdownFile })
+      const newBlocks = markdownToOfficialBlocks(md)
+
+      let cursor: string | undefined
+      do {
+        const response = await client.blocks.children.list({
+          block_id: pageId,
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        } as any)
+        for (const block of (response as any).results) {
+          await client.blocks.delete({ block_id: block.id })
+        }
+        cursor = (response as any).has_more ? (response as any).next_cursor : undefined
+      } while (cursor)
+
+      if (newBlocks.length > 0) {
+        try {
+          await client.appendBlockChildren(pageId, newBlocks)
+        } catch (appendError) {
+          throw new Error(`Page content cleared but new content failed to append: ${(appendError as Error).message}`)
+        }
+      }
+    }
+
+    const page = await client.pages.retrieve({ page_id: pageId })
     console.log(formatOutput(formatPage(page as Record<string, unknown>), options.pretty))
   } catch (error) {
     handleError(error as Error)
@@ -132,6 +178,9 @@ export const pageCommand = new Command('page')
       .description('Update page properties')
       .argument('<page_id>', 'Page ID')
       .option('--set <property=value>', 'Set a property value (repeatable)', parsePropertyPair, {})
+      .option('--replace-content', 'Replace all page content')
+      .option('--markdown <text>', 'Markdown content')
+      .option('--markdown-file <path>', 'Path to markdown file')
       .option('--pretty', 'Pretty print JSON output')
       .action(updateAction),
   )
