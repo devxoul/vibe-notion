@@ -65,6 +65,8 @@ describe('SearchCommand', () => {
     expect(result.results[0].title).toBe('Test Page')
     expect(result.results[0].score).toBe(0.95)
     expect(result.results[0].spaceId).toBeUndefined()
+    expect(result.has_more).toBe(false)
+    expect(result.next_cursor).toBeNull()
   })
 
   test('search with explicit workspace-id', async () => {
@@ -166,6 +168,71 @@ describe('SearchCommand', () => {
     console.log = originalLog
 
     expect(mockInternalRequest.mock.calls.length).toBeGreaterThan(0)
+  })
+
+  test('search passes start cursor and returns next_cursor when more results exist', async () => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
+      if (endpoint === 'search') {
+        expect(body.start).toBe(10)
+        expect(body.limit).toBe(2)
+        return {
+          results: [
+            {
+              id: 'page-3',
+              highlight: { title: 'Page 3' },
+              score: 0.7,
+              spaceId: 'space-123',
+            },
+            {
+              id: 'page-4',
+              highlight: { title: 'Page 4' },
+              score: 0.6,
+              spaceId: 'space-123',
+            },
+          ],
+          total: 20,
+        }
+      }
+      return {}
+    })
+
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-mock'),
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { searchCommand } = await import('./search')
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      await searchCommand.parseAsync(
+        ['test query', '--workspace-id', 'space-123', '--limit', '2', '--start-cursor', '10'],
+        { from: 'user' },
+      )
+    } catch {
+      // Expected to exit
+    }
+
+    console.log = originalLog
+
+    expect(output.length).toBeGreaterThan(0)
+    const result = JSON.parse(output[0])
+    expect(result.has_more).toBe(true)
+    expect(result.next_cursor).toBe('12')
   })
 
   test('search handles errors', async () => {

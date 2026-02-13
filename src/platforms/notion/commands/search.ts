@@ -6,6 +6,7 @@ import { type CommandOptions, getCredentialsOrExit, resolveAndSetActiveUserId } 
 type SearchOptions = CommandOptions & {
   workspaceId: string
   limit?: string
+  startCursor?: string
   navigableOnly?: boolean
 }
 
@@ -25,6 +26,8 @@ type SearchResponse = {
 
 async function searchAction(query: string, options: SearchOptions): Promise<void> {
   try {
+    const limit = options.limit ? Number(options.limit) : 20
+    const startOffset = parseStartCursor(options.startCursor)
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const spaceId = options.workspaceId
@@ -32,7 +35,8 @@ async function searchAction(query: string, options: SearchOptions): Promise<void
       type: 'BlocksInSpace',
       query: query,
       ...(spaceId ? { spaceId } : {}),
-      limit: options.limit ? Number(options.limit) : 20,
+      limit,
+      ...(options.startCursor ? { start: startOffset } : {}),
       filters: {
         isDeletedOnly: false,
         excludeTemplates: false,
@@ -49,12 +53,15 @@ async function searchAction(query: string, options: SearchOptions): Promise<void
     }
 
     const data = (await internalRequest(creds.token_v2, 'search', body)) as SearchResponse
+    const hasMore = data.results.length === limit && startOffset + data.results.length < data.total
     const output = {
       results: data.results.map((r) => ({
         id: r.id,
         title: r.highlight?.title || '',
         score: r.score,
       })),
+      has_more: hasMore,
+      next_cursor: hasMore ? String(startOffset + data.results.length) : null,
       total: data.total,
     }
 
@@ -65,10 +72,23 @@ async function searchAction(query: string, options: SearchOptions): Promise<void
   }
 }
 
+function parseStartCursor(rawCursor: string | undefined): number {
+  if (!rawCursor) {
+    return 0
+  }
+
+  const parsed = Number(rawCursor)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error('start-cursor must be a non-negative integer')
+  }
+  return parsed
+}
+
 export const searchCommand = new Command('search')
   .description('Search across workspace')
   .argument('<query>', 'Search query')
   .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
   .option('--limit <n>', 'Number of results')
+  .option('--start-cursor <n>', 'Pagination offset from previous response')
   .option('--pretty', 'Pretty print JSON output')
   .action(searchAction)
