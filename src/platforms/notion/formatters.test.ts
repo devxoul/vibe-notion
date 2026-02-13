@@ -178,7 +178,28 @@ describe('formatBlockChildren', () => {
     expect(result).toEqual({
       results: [
         { id: 'block-1', type: 'text', text: 'First' },
-        { id: 'block-2', type: 'to_do', text: 'Second' },
+        { id: 'block-2', type: 'to_do', text: 'Second', checked: false },
+      ],
+      has_more: false,
+      next_cursor: null,
+    })
+  })
+
+  test('includes checked state for to_do blocks', () => {
+    // Given
+    const blocks = [
+      { id: 'block-1', type: 'to_do', properties: { title: [['Checked item']], checked: [['Yes']] } },
+      { id: 'block-2', type: 'to_do', properties: { title: [['Unchecked item']], checked: [['No']] } },
+    ]
+
+    // When
+    const result = formatBlockChildren(blocks, false, null)
+
+    // Then
+    expect(result).toEqual({
+      results: [
+        { id: 'block-1', type: 'to_do', text: 'Checked item', checked: true },
+        { id: 'block-2', type: 'to_do', text: 'Unchecked item', checked: false },
       ],
       has_more: false,
       next_cursor: null,
@@ -232,7 +253,38 @@ describe('formatPageGet', () => {
       title: '',
       blocks: [
         { id: 'block-1', type: 'text', text: 'First' },
-        { id: 'block-2', type: 'to_do', text: 'Second' },
+        { id: 'block-2', type: 'to_do', text: 'Second', checked: false },
+      ],
+    })
+  })
+
+  test('includes checked state for to_do blocks', () => {
+    // Given
+    const blocks: Record<string, Record<string, unknown>> = {
+      'page-1': {
+        value: { id: 'page-1', type: 'page', content: ['block-1', 'block-2'] },
+        role: 'editor',
+      },
+      'block-1': {
+        value: { id: 'block-1', type: 'to_do', properties: { title: [['Done']], checked: [['Yes']] } },
+        role: 'editor',
+      },
+      'block-2': {
+        value: { id: 'block-2', type: 'to_do', properties: { title: [['Not done']] } },
+        role: 'editor',
+      },
+    }
+
+    // When
+    const result = formatPageGet(blocks, 'page-1')
+
+    // Then
+    expect(result).toEqual({
+      id: 'page-1',
+      title: '',
+      blocks: [
+        { id: 'block-1', type: 'to_do', text: 'Done', checked: true },
+        { id: 'block-2', type: 'to_do', text: 'Not done', checked: false },
       ],
     })
   })

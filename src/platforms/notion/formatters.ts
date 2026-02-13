@@ -27,6 +27,7 @@ export type SimplifiedBlock = {
   id: string
   type: string
   text: string
+  checked?: boolean
   children?: SimplifiedBlock[]
 }
 
@@ -46,6 +47,7 @@ export function formatBlockValue(block: Record<string, unknown>): {
   id: string
   type: string
   text: string
+  checked?: boolean
   content: string[] | undefined
   parent_id: string | undefined
   collection_id?: string
@@ -61,6 +63,7 @@ export function formatBlockValue(block: Record<string, unknown>): {
     id: toStringValue(block.id),
     type,
     text: extractBlockText(block),
+    ...(type === 'to_do' ? { checked: extractChecked(block) } : {}),
     content: content.length > 0 ? content : undefined,
     parent_id: toOptionalString(block.parent_id),
     ...(collectionId ? { collection_id: collectionId } : {}),
@@ -73,16 +76,20 @@ export function formatBlockChildren(
   hasMore: boolean,
   nextCursor: string | null,
 ): {
-  results: Array<{ id: string; type: string; text: string }>
+  results: Array<{ id: string; type: string; text: string; checked?: boolean }>
   has_more: boolean
   next_cursor: string | null
 } {
   return {
-    results: blocks.map((block) => ({
-      id: toStringValue(block.id),
-      type: toStringValue(block.type),
-      text: extractBlockText(block),
-    })),
+    results: blocks.map((block) => {
+      const type = toStringValue(block.type)
+      return {
+        id: toStringValue(block.id),
+        type,
+        text: extractBlockText(block),
+        ...(type === 'to_do' ? { checked: extractChecked(block) } : {}),
+      }
+    }),
     has_more: hasMore,
     next_cursor: nextCursor,
   }
@@ -410,10 +417,15 @@ function buildPageChildren(blocks: Record<string, Record<string, unknown>>, chil
       continue
     }
 
+    const type = toStringValue(child.type)
     const node: SimplifiedBlock = {
       id: toStringValue(child.id),
-      type: toStringValue(child.type),
+      type,
       text: extractBlockText(child),
+    }
+
+    if (type === 'to_do') {
+      node.checked = extractChecked(child)
     }
 
     const nestedIds = toStringArray(child.content)
@@ -634,6 +646,12 @@ function extractDecoratorIds(value: unknown, marker: string): string[] {
     }
   }
   return ids
+}
+
+function extractChecked(block: Record<string, unknown>): boolean {
+  const properties = toRecord(block.properties)
+  if (!properties) return false
+  return extractPropertyText(properties.checked) === 'Yes'
 }
 
 function extractDateValue(value: unknown): string | null {
