@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { internalRequest } from '../client'
 import { extractCollectionName, formatCollectionValue, formatQueryCollectionResponse } from '../formatters'
@@ -130,7 +131,8 @@ async function fetchCollection(tokenV2: string, collectionId: string): Promise<C
   return collection
 }
 
-async function getAction(collectionId: string, options: GetOptions): Promise<void> {
+async function getAction(rawCollectionId: string, options: GetOptions): Promise<void> {
+  const collectionId = formatNotionId(rawCollectionId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
@@ -142,7 +144,8 @@ async function getAction(collectionId: string, options: GetOptions): Promise<voi
   }
 }
 
-async function queryAction(collectionId: string, options: QueryOptions): Promise<void> {
+async function queryAction(rawCollectionId: string, options: QueryOptions): Promise<void> {
+  const collectionId = formatNotionId(rawCollectionId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
@@ -195,10 +198,11 @@ async function listAction(options: ListOptions): Promise<void> {
 }
 
 async function createAction(options: CreateOptions): Promise<void> {
+  const parent = formatNotionId(options.parent)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const spaceId = await resolveSpaceId(creds.token_v2, options.parent)
+    const spaceId = await resolveSpaceId(creds.token_v2, parent)
     const collId = generateId()
     const viewId = generateId()
     const blockId = generateId()
@@ -251,7 +255,7 @@ async function createAction(options: CreateOptions): Promise<void> {
                 id: blockId,
                 collection_id: collId,
                 view_ids: [viewId],
-                parent_id: options.parent,
+                parent_id: parent,
                 parent_table: 'block',
                 alive: true,
                 space_id: spaceId,
@@ -259,7 +263,7 @@ async function createAction(options: CreateOptions): Promise<void> {
               },
             },
             {
-              pointer: { table: 'block', id: options.parent, spaceId },
+              pointer: { table: 'block', id: parent, spaceId },
               command: 'listAfter',
               path: ['content'],
               args: { id: blockId },
@@ -277,7 +281,8 @@ async function createAction(options: CreateOptions): Promise<void> {
   }
 }
 
-async function updateAction(collectionId: string, options: UpdateOptions): Promise<void> {
+async function updateAction(rawCollectionId: string, options: UpdateOptions): Promise<void> {
+  const collectionId = formatNotionId(rawCollectionId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)

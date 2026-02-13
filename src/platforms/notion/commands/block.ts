@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { internalRequest } from '../client'
 import { formatBlockChildren, formatBlockValue } from '../formatters'
@@ -144,7 +145,8 @@ function assertBlock(block: BlockValue | undefined, blockId: string): BlockValue
   return block
 }
 
-async function getAction(blockId: string, options: WorkspaceOptions): Promise<void> {
+async function getAction(rawBlockId: string, options: WorkspaceOptions): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
@@ -160,7 +162,8 @@ async function getAction(blockId: string, options: WorkspaceOptions): Promise<vo
   }
 }
 
-async function childrenAction(blockId: string, options: ChildListOptions): Promise<void> {
+async function childrenAction(rawBlockId: string, options: ChildListOptions): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
@@ -187,7 +190,8 @@ async function childrenAction(blockId: string, options: ChildListOptions): Promi
   }
 }
 
-async function appendAction(parentId: string, options: AppendOptions): Promise<void> {
+async function appendAction(rawParentId: string, options: AppendOptions): Promise<void> {
+  const parentId = formatNotionId(rawParentId)
   try {
     const defs = parseBlockDefinitions(options.content)
     if (defs.length === 0) {
@@ -242,7 +246,8 @@ async function appendAction(parentId: string, options: AppendOptions): Promise<v
   }
 }
 
-async function updateAction(blockId: string, options: UpdateOptions): Promise<void> {
+async function updateAction(rawBlockId: string, options: UpdateOptions): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const content = parseUpdateContent(options.content)
     const creds = await getCredentialsOrExit()
@@ -281,7 +286,8 @@ async function updateAction(blockId: string, options: UpdateOptions): Promise<vo
   }
 }
 
-async function deleteAction(blockId: string, options: WorkspaceOptions): Promise<void> {
+async function deleteAction(rawBlockId: string, options: WorkspaceOptions): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)

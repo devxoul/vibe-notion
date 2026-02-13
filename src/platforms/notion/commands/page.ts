@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { internalRequest } from '../client'
 import { formatBlockRecord, formatPageGet } from '../formatters'
@@ -166,7 +167,8 @@ async function listAction(options: ListPageOptions): Promise<void> {
   }
 }
 
-async function getAction(pageId: string, options: LoadPageChunkOptions): Promise<void> {
+async function getAction(rawPageId: string, options: LoadPageChunkOptions): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
@@ -199,10 +201,11 @@ async function getAction(pageId: string, options: LoadPageChunkOptions): Promise
 }
 
 async function createAction(options: CreatePageOptions): Promise<void> {
+  const parent = formatNotionId(options.parent)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const spaceId = await resolveSpaceId(creds.token_v2, options.parent)
+    const spaceId = await resolveSpaceId(creds.token_v2, parent)
     const newPageId = generateId()
 
     const operations: BlockOperation[] = [
@@ -214,7 +217,7 @@ async function createAction(options: CreatePageOptions): Promise<void> {
           type: 'page',
           id: newPageId,
           version: 1,
-          parent_id: options.parent,
+          parent_id: parent,
           parent_table: 'block',
           alive: true,
           properties: { title: [[options.title]] },
@@ -222,7 +225,7 @@ async function createAction(options: CreatePageOptions): Promise<void> {
         },
       },
       {
-        pointer: { table: 'block', id: options.parent, spaceId },
+        pointer: { table: 'block', id: parent, spaceId },
         command: 'listAfter',
         path: ['content'],
         args: { id: newPageId },
@@ -246,7 +249,8 @@ async function createAction(options: CreatePageOptions): Promise<void> {
   }
 }
 
-async function updateAction(pageId: string, options: UpdatePageOptions): Promise<void> {
+async function updateAction(rawPageId: string, options: UpdatePageOptions): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
@@ -293,7 +297,8 @@ async function updateAction(pageId: string, options: UpdatePageOptions): Promise
   }
 }
 
-async function archiveAction(pageId: string, options: ArchivePageOptions): Promise<void> {
+async function archiveAction(rawPageId: string, options: ArchivePageOptions): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
