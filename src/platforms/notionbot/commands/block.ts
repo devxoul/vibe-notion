@@ -1,10 +1,10 @@
 import type { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints'
 import { Command } from 'commander'
-import { handleError } from '../../../shared/utils/error-handler'
-import { formatNotionId } from '../../../shared/utils/id'
-import { formatOutput } from '../../../shared/utils/output'
-import { getClient } from '../client'
-import { formatAppendResponse, formatBlock, formatBlockChildrenResponse } from '../formatters'
+import { getClient } from '@/platforms/notionbot/client'
+import { formatAppendResponse, formatBlock, formatBlockChildrenResponse } from '@/platforms/notionbot/formatters'
+import { handleError } from '@/shared/utils/error-handler'
+import { formatNotionId } from '@/shared/utils/id'
+import { formatOutput } from '@/shared/utils/output'
 
 async function getAction(rawBlockId: string, options: { pretty?: boolean }): Promise<void> {
   const blockId = formatNotionId(rawBlockId)

@@ -1,9 +1,9 @@
 import { Command } from 'commander'
-import { handleError } from '../../../shared/utils/error-handler'
-import { formatNotionId } from '../../../shared/utils/id'
-import { formatOutput } from '../../../shared/utils/output'
-import { getClient } from '../client'
-import { formatDatabase, formatDatabaseListResults, formatDatabaseQueryResults } from '../formatters'
+import { getClient } from '@/platforms/notionbot/client'
+import { formatDatabase, formatDatabaseListResults, formatDatabaseQueryResults } from '@/platforms/notionbot/formatters'
+import { handleError } from '@/shared/utils/error-handler'
+import { formatNotionId } from '@/shared/utils/id'
+import { formatOutput } from '@/shared/utils/output'
 
 interface PrettyOption {
   pretty?: boolean
