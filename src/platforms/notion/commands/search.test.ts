@@ -282,4 +282,110 @@ describe('SearchCommand', () => {
     expect(errorMsg.error).toBe('API error')
     expect(exitCode).toBe(1)
   })
+
+  test('strips highlight tags from search result titles', async () => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, _body: any) => {
+      if (endpoint === 'search') {
+        return {
+          results: [
+            {
+              id: 'page-1',
+              highlight: { title: '<gzkNfoUU>CSM</gzkNfoUU> Weekly' },
+              score: 0.95,
+              spaceId: 'space-123',
+            },
+          ],
+          total: 1,
+        }
+      }
+      return {}
+    })
+
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-mock'),
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { searchCommand } = await import('./search')
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      await searchCommand.parseAsync(['test query', '--workspace-id', 'space-123'], { from: 'user' })
+    } catch {
+      // Expected to exit
+    }
+
+    console.log = originalLog
+
+    expect(output.length).toBeGreaterThan(0)
+    const result = JSON.parse(output[0])
+    expect(result.results[0].title).toBe('CSM Weekly')
+  })
+
+  test('strips multiple highlight tags from titles', async () => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, _body: any) => {
+      if (endpoint === 'search') {
+        return {
+          results: [
+            {
+              id: 'page-1',
+              highlight: { title: '<gzkNfoUU>Foo</gzkNfoUU> bar <gzkNfoUU>baz</gzkNfoUU>' },
+              score: 0.95,
+              spaceId: 'space-123',
+            },
+          ],
+          total: 1,
+        }
+      }
+      return {}
+    })
+
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-mock'),
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { searchCommand } = await import('./search')
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      await searchCommand.parseAsync(['test query', '--workspace-id', 'space-123'], { from: 'user' })
+    } catch {
+      // Expected to exit
+    }
+
+    console.log = originalLog
+
+    expect(output.length).toBeGreaterThan(0)
+    const result = JSON.parse(output[0])
+    expect(result.results[0].title).toBe('Foo bar baz')
+  })
 })

@@ -57,7 +57,7 @@ async function searchAction(query: string, options: SearchOptions): Promise<void
     const output = {
       results: data.results.map((r) => ({
         id: r.id,
-        title: r.highlight?.title || '',
+        title: (r.highlight?.title || '').replace(/<\/?gzkNfoUU>/gi, ''),
         score: r.score,
       })),
       has_more: hasMore,
