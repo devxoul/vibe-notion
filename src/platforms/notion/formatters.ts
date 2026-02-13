@@ -1,6 +1,8 @@
+export type MentionRef = { id: string; type: 'page'; title?: string } | { id: string; type: 'user'; name?: string }
+
 export type PropertyValue =
-  | { type: 'title'; value: string }
-  | { type: 'text'; value: string }
+  | { type: 'title'; value: string; mentions?: MentionRef[] }
+  | { type: 'text'; value: string; mentions?: MentionRef[] }
   | { type: 'number'; value: number | null }
   | { type: 'select'; value: string }
   | { type: 'multi_select'; value: string[] }
@@ -221,6 +223,19 @@ export function collectReferenceIds(results: Array<{ id: string; properties: Rec
           }
         }
       }
+
+      if (prop.type === 'title' || prop.type === 'text') {
+        const mentions = (prop as { mentions?: MentionRef[] }).mentions
+        if (mentions) {
+          for (const mention of mentions) {
+            if (mention.type === 'page') {
+              pageIdSet.add(mention.id)
+            } else if (mention.type === 'user') {
+              userIdSet.add(mention.id)
+            }
+          }
+        }
+      }
     }
   }
 
@@ -249,6 +264,28 @@ export function enrichProperties(
             id,
             name: userLookup[id] ?? id,
           })),
+        }
+      }
+
+      if (prop.type === 'title' || prop.type === 'text') {
+        const mentions = (prop as { mentions?: MentionRef[] }).mentions
+        if (mentions) {
+          let resolvedValue = prop.value as string
+          const resolvedMentions: MentionRef[] = mentions.map((mention) => {
+            if (mention.type === 'page') {
+              const title = pageLookup[mention.id] ?? mention.id
+              resolvedValue = resolvedValue.replace(mention.id, title)
+              return { id: mention.id, type: 'page' as const, title }
+            }
+            const userName = userLookup[mention.id] ?? mention.id
+            resolvedValue = resolvedValue.replace(mention.id, userName)
+            return { id: mention.id, type: 'user' as const, name: userName }
+          })
+          row.properties[name] = {
+            type: prop.type as 'title' | 'text',
+            value: resolvedValue,
+            mentions: resolvedMentions,
+          }
         }
       }
     }
@@ -430,7 +467,14 @@ function extractPropertyValue(value: unknown, schemaType: string): PropertyValue
       return { type: 'multi_select', value: text ? text.split(',') : [] }
     }
     case 'title':
-    case 'text':
+    case 'text': {
+      const text = extractPropertyText(value)
+      const mentions = extractMentionRefs(value)
+      if (mentions.length > 0) {
+        return { type: schemaType as 'title' | 'text', value: text, mentions }
+      }
+      return { type: schemaType, value: text }
+    }
     case 'url':
     case 'email':
     case 'phone_number':
@@ -443,6 +487,26 @@ function extractPropertyValue(value: unknown, schemaType: string): PropertyValue
     default:
       return { type: schemaType, value: extractPropertyText(value) }
   }
+}
+
+function extractMentionRefs(value: unknown): MentionRef[] {
+  if (!Array.isArray(value)) return []
+
+  const refs: MentionRef[] = []
+  for (const segment of value) {
+    if (!Array.isArray(segment) || segment.length < 2) continue
+    if (!Array.isArray(segment[1])) continue
+
+    for (const deco of segment[1]) {
+      if (!Array.isArray(deco) || deco.length < 2) continue
+      if (deco[0] === 'p' && typeof deco[1] === 'string') {
+        refs.push({ id: deco[1], type: 'page' })
+      } else if (deco[0] === 'u' && typeof deco[1] === 'string') {
+        refs.push({ id: deco[1], type: 'user' })
+      }
+    }
+  }
+  return refs
 }
 
 function extractDecoratorIds(value: unknown, marker: string): string[] {

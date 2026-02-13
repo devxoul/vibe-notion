@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { PropertyValue } from './formatters'
+import type { MentionRef, PropertyValue } from './formatters'
 import {
   collectReferenceIds,
   enrichProperties,
@@ -728,6 +728,126 @@ describe('formatQueryCollectionResponse', () => {
     })
   })
 
+  test('extracts mentions from title property with user reference', () => {
+    // Given
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: { blockIds: ['row-1'], hasMore: false },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              properties: {
+                titleKey: [['‣', [['u', 'user-abc']]]],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: { titleKey: { name: '이름', type: 'title' } },
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    expect(result.results[0].properties).toEqual({
+      이름: {
+        type: 'title',
+        value: 'user-abc',
+        mentions: [{ id: 'user-abc', type: 'user' }],
+      },
+    })
+  })
+
+  test('extracts mentions from text property with page reference', () => {
+    // Given
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: { blockIds: ['row-1'], hasMore: false },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              properties: {
+                textKey: [['See '], ['‣', [['p', 'page-xyz']]]],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: { textKey: { name: '설명', type: 'text' } },
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    expect(result.results[0].properties).toEqual({
+      설명: {
+        type: 'text',
+        value: 'See page-xyz',
+        mentions: [{ id: 'page-xyz', type: 'page' }],
+      },
+    })
+  })
+
+  test('omits mentions field for plain title without references', () => {
+    // Given
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: { blockIds: ['row-1'], hasMore: false },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            value: { id: 'row-1', properties: { titleKey: [['Just text']] } },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: { titleKey: { name: '이름', type: 'title' } },
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    const prop = result.results[0].properties.이름
+    expect(prop).toEqual({ type: 'title', value: 'Just text' })
+    expect('mentions' in prop).toBe(false)
+  })
+
   test('returns relation with multiple targets', () => {
     // Given
     const response = {
@@ -908,6 +1028,34 @@ describe('collectReferenceIds', () => {
     expect(refs.userIds).toEqual([])
   })
 
+  test('collects page and user IDs from title/text mentions', () => {
+    // Given
+    const results: Array<{ id: string; properties: Record<string, PropertyValue> }> = [
+      {
+        id: 'row-1',
+        properties: {
+          이름: {
+            type: 'title',
+            value: 'user-1',
+            mentions: [{ id: 'user-1', type: 'user' }],
+          },
+          설명: {
+            type: 'text',
+            value: 'page-1',
+            mentions: [{ id: 'page-1', type: 'page' }],
+          },
+        },
+      },
+    ]
+
+    // When
+    const refs = collectReferenceIds(results)
+
+    // Then
+    expect(refs.pageIds).toEqual(['page-1'])
+    expect(refs.userIds).toEqual(['user-1'])
+  })
+
   test('deduplicates IDs', () => {
     // Given
     const results: Array<{ id: string; properties: Record<string, PropertyValue> }> = [
@@ -981,6 +1129,64 @@ describe('enrichProperties', () => {
     expect(prop.value).toEqual([{ id: 'user-1', name: 'Leo (주원)' }])
   })
 
+  test('resolves user mentions in title property', () => {
+    // Given
+    const results: Array<{ id: string; properties: Record<string, PropertyValue> }> = [
+      {
+        id: 'row-1',
+        properties: {
+          이름: {
+            type: 'title',
+            value: 'user-1',
+            mentions: [{ id: 'user-1', type: 'user' }],
+          },
+        },
+      },
+    ]
+    const pageLookup = {}
+    const userLookup = { 'user-1': 'Leo (주원)' }
+
+    // When
+    enrichProperties(results, pageLookup, userLookup)
+
+    // Then
+    const prop = results[0].properties.이름
+    expect(prop).toEqual({
+      type: 'title',
+      value: 'Leo (주원)',
+      mentions: [{ id: 'user-1', type: 'user', name: 'Leo (주원)' }],
+    })
+  })
+
+  test('resolves page mentions in text property', () => {
+    // Given
+    const results: Array<{ id: string; properties: Record<string, PropertyValue> }> = [
+      {
+        id: 'row-1',
+        properties: {
+          설명: {
+            type: 'text',
+            value: 'See page-1 for details',
+            mentions: [{ id: 'page-1', type: 'page' }],
+          },
+        },
+      },
+    ]
+    const pageLookup = { 'page-1': 'Roadmap' }
+    const userLookup = {}
+
+    // When
+    enrichProperties(results, pageLookup, userLookup)
+
+    // Then
+    const prop = results[0].properties.설명
+    expect(prop).toEqual({
+      type: 'text',
+      value: 'See Roadmap for details',
+      mentions: [{ id: 'page-1', type: 'page', title: 'Roadmap' }],
+    })
+  })
+
   test('graceful degradation: missing lookup uses raw ID as title/name', () => {
     // Given
     const results: Array<{ id: string; properties: Record<string, PropertyValue> }> = [
@@ -1004,5 +1210,32 @@ describe('enrichProperties', () => {
     const personProp = results[0].properties.담당자
     expect(personProp.type).toBe('person')
     expect(personProp.value).toEqual([{ id: 'user-unknown', name: 'user-unknown' }])
+  })
+
+  test('graceful degradation: missing lookup for mentions uses raw ID', () => {
+    // Given
+    const results: Array<{ id: string; properties: Record<string, PropertyValue> }> = [
+      {
+        id: 'row-1',
+        properties: {
+          이름: {
+            type: 'title',
+            value: 'user-unknown',
+            mentions: [{ id: 'user-unknown', type: 'user' }],
+          },
+        },
+      },
+    ]
+
+    // When
+    enrichProperties(results, {}, {})
+
+    // Then
+    const prop = results[0].properties.이름
+    expect(prop).toEqual({
+      type: 'title',
+      value: 'user-unknown',
+      mentions: [{ id: 'user-unknown', type: 'user', name: 'user-unknown' }],
+    })
   })
 })
