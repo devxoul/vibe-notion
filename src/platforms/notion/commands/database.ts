@@ -4,6 +4,7 @@ import {
   collectReferenceIds,
   enrichProperties,
   extractCollectionName,
+  formatBlockRecord,
   formatCollectionValue,
   formatQueryCollectionResponse,
 } from '@/platforms/notion/formatters'
@@ -121,6 +122,11 @@ type CreateOptions = WorkspaceOptions & {
 
 type UpdateOptions = WorkspaceOptions & {
   title?: string
+  properties?: string
+}
+
+type AddRowOptions = WorkspaceOptions & {
+  title: string
   properties?: string
 }
 
@@ -433,6 +439,129 @@ async function updateAction(rawCollectionId: string, options: UpdateOptions): Pr
   }
 }
 
+async function addRowAction(rawCollectionId: string, options: AddRowOptions): Promise<void> {
+  const collectionId = formatNotionId(rawCollectionId)
+  try {
+    const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
+
+    const collection = await fetchCollection(creds.token_v2, collectionId)
+    const parentBlockId = collection.parent_id
+    if (!parentBlockId) {
+      throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
+    }
+    const spaceId = await resolveSpaceId(creds.token_v2, parentBlockId)
+
+    const newRowId = generateId()
+    const properties: Record<string, unknown> = { title: [[options.title]] }
+
+    if (options.properties) {
+      const schema = collection.schema ?? {}
+      const nameToId: Record<string, string> = {}
+      for (const [propId, prop] of Object.entries(schema)) {
+        nameToId[prop.name] = propId
+      }
+
+      const parsed = JSON.parse(options.properties) as Record<string, unknown>
+      for (const [name, value] of Object.entries(parsed)) {
+        const propId = nameToId[name]
+        if (!propId) {
+          throw new Error(
+            `Unknown property: "${name}". Available: ${Object.values(schema)
+              .map((p) => p.name)
+              .join(', ')}`,
+          )
+        }
+        const propType = schema[propId].type
+        if (propType === 'title') {
+          properties.title = [[value as string]]
+        } else if (propType === 'select' || propType === 'status') {
+          properties[propId] = [[value as string]]
+        } else if (propType === 'multi_select') {
+          const values = value as string[]
+          const segments: string[] = []
+          for (let i = 0; i < values.length; i++) {
+            if (i > 0) segments.push(',')
+            segments.push(values[i])
+          }
+          properties[propId] = [segments]
+        } else if (propType === 'number') {
+          properties[propId] = [[String(value)]]
+        } else if (propType === 'checkbox') {
+          properties[propId] = [[value ? 'Yes' : 'No']]
+        } else if (propType === 'date') {
+          const dateValue = value as { start: string; end?: string }
+          const dateArgs: Record<string, string> = {
+            type: 'date',
+            start_date: dateValue.start,
+          }
+          if (dateValue.end) {
+            dateArgs.end_date = dateValue.end
+          }
+          properties[propId] = [['‣', [['d', dateArgs]]]]
+        } else if (propType === 'url' || propType === 'email' || propType === 'phone_number') {
+          properties[propId] = [[value as string]]
+        } else if (propType === 'text') {
+          properties[propId] = [[value as string]]
+        } else if (propType === 'person') {
+          const userIds = value as string[]
+          properties[propId] = userIds
+            .map((uid) => ['‣', [['u', uid]]])
+            .reduce((acc, v, i) => (i === 0 ? v : [...acc, [','], ...v]), [] as unknown[])
+        } else if (propType === 'relation') {
+          const pageIds = value as string[]
+          properties[propId] = pageIds
+            .map((pid) => ['‣', [['p', formatNotionId(pid)]]])
+            .reduce((acc, v, i) => (i === 0 ? v : [...acc, [','], ...v]), [] as unknown[])
+        } else {
+          properties[propId] = [[value as string]]
+        }
+      }
+    }
+
+    const viewId = await resolveCollectionViewId(creds.token_v2, collectionId)
+
+    const operations = [
+      {
+        pointer: { table: 'block' as const, id: newRowId, spaceId },
+        command: 'set' as const,
+        path: [] as string[],
+        args: {
+          type: 'page',
+          id: newRowId,
+          version: 1,
+          parent_id: collectionId,
+          parent_table: 'collection',
+          alive: true,
+          properties,
+          space_id: spaceId,
+        },
+      },
+      {
+        pointer: { table: 'collection_view' as const, id: viewId, spaceId },
+        command: 'listAfter' as const,
+        path: ['page_sort'],
+        args: { id: newRowId },
+      },
+    ]
+
+    await internalRequest(creds.token_v2, 'saveTransactions', {
+      requestId: generateId(),
+      transactions: [{ id: generateId(), spaceId, operations }],
+    })
+
+    const created = (await internalRequest(creds.token_v2, 'syncRecordValues', {
+      requests: [{ pointer: { table: 'block', id: newRowId }, version: -1 }],
+    })) as { recordMap: { block: Record<string, Record<string, unknown>> } }
+
+    const createdBlock = Object.values(created.recordMap.block)[0]
+    console.log(formatOutput(formatBlockRecord(createdBlock), options.pretty))
+  } catch (error) {
+    console.error(JSON.stringify({ error: (error as Error).message }))
+    process.exit(1)
+  }
+}
+
 export const databaseCommand = new Command('database')
   .description('Database commands')
   .addCommand(
@@ -483,4 +612,14 @@ export const databaseCommand = new Command('database')
       .option('--properties <json>', 'Schema properties as JSON')
       .option('--pretty')
       .action(updateAction),
+  )
+  .addCommand(
+    new Command('add-row')
+      .description('Add a row to a database')
+      .argument('<collection_id>')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
+      .requiredOption('--title <title>', 'Row title (Name property)')
+      .option('--properties <json>', 'Row properties as JSON (use property names from schema)')
+      .option('--pretty')
+      .action(addRowAction),
   )

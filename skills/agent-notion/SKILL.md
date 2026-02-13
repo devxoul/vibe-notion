@@ -191,6 +191,10 @@ agent-notion database create --workspace-id <workspace_id> --parent <page_id> --
 
 # Update database title or schema
 agent-notion database update <collection_id> --workspace-id <workspace_id> --title "New Name" --pretty
+
+# Add a row to a database
+agent-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --pretty
+agent-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --properties '{"Status":"In Progress","Due":{"start":"2025-03-01"}}' --pretty
 ```
 
 ### Block Commands
