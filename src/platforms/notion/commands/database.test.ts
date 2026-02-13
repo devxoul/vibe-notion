@@ -34,6 +34,7 @@ describe('database get', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-123'),
       resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -44,7 +45,7 @@ describe('database get', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['get', 'coll-1'], { from: 'user' })
+      await databaseCommand.parseAsync(['get', 'coll-1', '--workspace-id', 'space-123'], { from: 'user' })
     } finally {
       console.log = originalLog
     }
@@ -79,6 +80,7 @@ describe('database get', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-123'),
       resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const originalExit = process.exit
@@ -92,7 +94,7 @@ describe('database get', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['get', 'coll-1'], { from: 'user' })
+      await databaseCommand.parseAsync(['get', 'coll-1', '--workspace-id', 'space-123'], { from: 'user' })
     } catch {
       // Expected to throw
     } finally {
@@ -137,6 +139,7 @@ describe('database query', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mockResolveCollectionViewId,
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -147,7 +150,7 @@ describe('database query', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['query', 'coll-1'], { from: 'user' })
+      await databaseCommand.parseAsync(['query', 'coll-1', '--workspace-id', 'space-123'], { from: 'user' })
     } finally {
       console.log = originalLog
     }
@@ -188,6 +191,7 @@ describe('database query', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mockResolveCollectionViewId,
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -198,9 +202,12 @@ describe('database query', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['query', 'coll-1', '--view-id', 'custom-view-id'], {
-        from: 'user',
-      })
+      await databaseCommand.parseAsync(
+        ['query', 'coll-1', '--workspace-id', 'space-123', '--view-id', 'custom-view-id'],
+        {
+          from: 'user',
+        },
+      )
     } finally {
       console.log = originalLog
     }
@@ -257,6 +264,7 @@ describe('database list', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-123'),
       resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -267,7 +275,7 @@ describe('database list', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['list'], { from: 'user' })
+      await databaseCommand.parseAsync(['list', '--workspace-id', 'space-123'], { from: 'user' })
     } finally {
       console.log = originalLog
     }
@@ -320,6 +328,7 @@ describe('database create', () => {
       generateId: mockGenerateId,
       resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mockResolveCollectionViewId,
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -330,9 +339,12 @@ describe('database create', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['create', '--parent', 'parent-123', '--title', 'New DB'], {
-        from: 'user',
-      })
+      await databaseCommand.parseAsync(
+        ['create', '--workspace-id', 'space-123', '--parent', 'parent-123', '--title', 'New DB'],
+        {
+          from: 'user',
+        },
+      )
     } finally {
       console.log = originalLog
     }
@@ -416,6 +428,7 @@ describe('database update', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-123'),
       resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -426,7 +439,7 @@ describe('database update', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['update', 'coll-1', '--title', 'New Title'], {
+      await databaseCommand.parseAsync(['update', 'coll-1', '--workspace-id', 'space-123', '--title', 'New Title'], {
         from: 'user',
       })
     } finally {
@@ -474,6 +487,7 @@ describe('database update', () => {
       generateId: mock(() => 'mock-uuid'),
       resolveSpaceId: mock(async () => 'space-123'),
       resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
     }))
 
     const { databaseCommand } = await import('./database')
@@ -484,7 +498,7 @@ describe('database update', () => {
 
     try {
       // When
-      await databaseCommand.parseAsync(['update', 'coll-1'], { from: 'user' })
+      await databaseCommand.parseAsync(['update', 'coll-1', '--workspace-id', 'space-123'], { from: 'user' })
     } finally {
       console.log = originalLog
     }

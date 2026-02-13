@@ -5,9 +5,12 @@ import {
   type CommandOptions,
   generateId,
   getCredentialsOrExit,
+  resolveAndSetActiveUserId,
   resolveCollectionViewId,
   resolveSpaceId,
 } from './helpers'
+
+type WorkspaceOptions = CommandOptions & { workspaceId: string }
 
 type CollectionPropertyType =
   | 'title'
@@ -78,20 +81,24 @@ type LoadUserContentResponse = {
   }
 }
 
-type QueryOptions = CommandOptions & {
+type GetOptions = WorkspaceOptions
+
+type QueryOptions = WorkspaceOptions & {
   viewId?: string
   limit?: string
   searchQuery?: string
   timezone?: string
 }
 
-type CreateOptions = CommandOptions & {
+type ListOptions = WorkspaceOptions
+
+type CreateOptions = WorkspaceOptions & {
   parent: string
   title: string
   properties?: string
 }
 
-type UpdateOptions = CommandOptions & {
+type UpdateOptions = WorkspaceOptions & {
   title?: string
   properties?: string
 }
@@ -122,9 +129,10 @@ async function fetchCollection(tokenV2: string, collectionId: string): Promise<C
   return collection
 }
 
-async function getAction(collectionId: string, options: CommandOptions): Promise<void> {
+async function getAction(collectionId: string, options: GetOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const collection = await fetchCollection(creds.token_v2, collectionId)
     console.log(formatOutput(collection, options.pretty))
   } catch (error) {
@@ -136,6 +144,7 @@ async function getAction(collectionId: string, options: CommandOptions): Promise
 async function queryAction(collectionId: string, options: QueryOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const viewId = options.viewId ?? (await resolveCollectionViewId(creds.token_v2, collectionId))
 
     const response = (await internalRequest(creds.token_v2, 'queryCollection', {
@@ -166,9 +175,10 @@ async function queryAction(collectionId: string, options: QueryOptions): Promise
   }
 }
 
-async function listAction(options: CommandOptions): Promise<void> {
+async function listAction(options: ListOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const response = (await internalRequest(creds.token_v2, 'loadUserContent', {})) as LoadUserContentResponse
 
     const output = Object.values(response.recordMap.collection ?? {}).map((record) => {
@@ -191,6 +201,7 @@ async function listAction(options: CommandOptions): Promise<void> {
 async function createAction(options: CreateOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const spaceId = await resolveSpaceId(creds.token_v2, options.parent)
     const collId = generateId()
     const viewId = generateId()
@@ -273,6 +284,7 @@ async function createAction(options: CreateOptions): Promise<void> {
 async function updateAction(collectionId: string, options: UpdateOptions): Promise<void> {
   try {
     const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const current = await fetchCollection(creds.token_v2, collectionId)
 
     if (!options.title && !options.properties) {
@@ -335,6 +347,7 @@ export const databaseCommand = new Command('database')
     new Command('get')
       .description('Retrieve database schema')
       .argument('<collection_id>')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .option('--pretty')
       .action(getAction),
   )
@@ -342,6 +355,7 @@ export const databaseCommand = new Command('database')
     new Command('query')
       .description('Query a database')
       .argument('<collection_id>')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .option('--view-id <id>', 'Collection view ID (auto-resolved if omitted)')
       .option('--limit <n>', 'Results limit')
       .option('--search-query <q>', 'Search within results')
@@ -349,10 +363,17 @@ export const databaseCommand = new Command('database')
       .option('--pretty')
       .action(queryAction),
   )
-  .addCommand(new Command('list').description('List all databases').option('--pretty').action(listAction))
+  .addCommand(
+    new Command('list')
+      .description('List all databases')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
+      .option('--pretty')
+      .action(listAction),
+  )
   .addCommand(
     new Command('create')
       .description('Create a database')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .requiredOption('--parent <id>', 'Parent page ID')
       .requiredOption('--title <title>', 'Database title')
       .option('--properties <json>', 'Schema properties as JSON')
@@ -363,6 +384,7 @@ export const databaseCommand = new Command('database')
     new Command('update')
       .description('Update database')
       .argument('<collection_id>')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .option('--title <title>', 'New title')
       .option('--properties <json>', 'Schema properties as JSON')
       .option('--pretty')
