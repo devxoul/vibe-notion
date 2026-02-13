@@ -10,6 +10,7 @@ A full-coverage, agent-friendly CLI for the Notion API. Built for AI agents to i
 - 📦 **Full API coverage** — Pages, databases, blocks, users, search, and comments
 - 🔑 **Simple Auth** — Just set your `NOTION_TOKEN` environment variable
 - 👤 **Human friendly too** — Add `--pretty` for readable output
+- 🧠 **Agent memory** — Remembers workspace IDs, page names, and preferences across sessions
 - 🪙 **Token efficient** — CLI, not MCP. Load only what you need. ([Why not MCP?](#-philosophy))
 
 ## 📦 Installation
