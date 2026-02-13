@@ -53,9 +53,9 @@ type SyncRecordValuesResponse = {
   }
 }
 
-type BlockOperation = {
+type Operation = {
   pointer: {
-    table: 'block'
+    table: 'block' | 'collection'
     id: string
     spaceId: string
   }
@@ -225,7 +225,7 @@ async function createAction(options: CreatePageOptions): Promise<void> {
     const spaceId = await resolveSpaceId(creds.token_v2, parent)
     const newPageId = generateId()
 
-    const operations: BlockOperation[] = [
+    const operations: Operation[] = [
       {
         pointer: { table: 'block', id: newPageId, spaceId },
         command: 'set',
@@ -259,7 +259,7 @@ async function createAction(options: CreatePageOptions): Promise<void> {
       const blockDefs = markdownToBlocks(markdown)
 
       if (blockDefs.length > 0) {
-        const blockOperations: BlockOperation[] = []
+        const blockOperations: Operation[] = []
 
         for (const def of blockDefs) {
           const newBlockId = generateId()
@@ -315,7 +315,7 @@ async function updateAction(rawPageId: string, options: UpdatePageOptions): Prom
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
     const spaceId = await resolveSpaceId(creds.token_v2, pageId)
 
-    const operations: BlockOperation[] = []
+    const operations: Operation[] = []
 
     if (options.title) {
       operations.push({
@@ -327,12 +327,29 @@ async function updateAction(rawPageId: string, options: UpdatePageOptions): Prom
     }
 
     if (options.icon) {
-      operations.push({
-        pointer: { table: 'block', id: pageId, spaceId },
-        command: 'set',
-        path: ['format', 'page_icon'],
-        args: options.icon,
-      })
+      // For collection_view_page, the icon lives on the collection record
+      const blockResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
+        requests: [{ pointer: { table: 'block', id: pageId }, version: -1 }],
+      })) as SyncRecordValuesResponse
+      const block = pickBlock(blockResponse, pageId)
+      const blockType = block?.value?.type as string | undefined
+      const collectionId = block?.value?.collection_id as string | undefined
+
+      if (blockType === 'collection_view_page' && collectionId) {
+        operations.push({
+          pointer: { table: 'collection', id: collectionId, spaceId },
+          command: 'set',
+          path: ['icon'],
+          args: options.icon,
+        })
+      } else {
+        operations.push({
+          pointer: { table: 'block', id: pageId, spaceId },
+          command: 'set',
+          path: ['format', 'page_icon'],
+          args: options.icon,
+        })
+      }
     }
 
     if (operations.length === 0 && !options.replaceContent) {
@@ -366,7 +383,7 @@ async function updateAction(rawPageId: string, options: UpdatePageOptions): Prom
       const existingChildIds = (parentBlock?.content as string[] | undefined) ?? []
 
       if (existingChildIds.length > 0) {
-        const deleteOps: BlockOperation[] = existingChildIds.flatMap((childId) => [
+        const deleteOps: Operation[] = existingChildIds.flatMap((childId) => [
           {
             pointer: { table: 'block' as const, id: childId, spaceId },
             command: 'update' as const,
@@ -387,7 +404,7 @@ async function updateAction(rawPageId: string, options: UpdatePageOptions): Prom
         })
       }
 
-      const appendOps: BlockOperation[] = newBlocks.flatMap((def) => {
+      const appendOps: Operation[] = newBlocks.flatMap((def) => {
         const newBlockId = generateId()
         return [
           {
@@ -454,7 +471,7 @@ async function archiveAction(rawPageId: string, options: ArchivePageOptions): Pr
       throw new Error(`Could not determine parent_id or space_id for page: ${pageId}`)
     }
 
-    const operations: BlockOperation[] = [
+    const operations: Operation[] = [
       {
         pointer: { table: 'block', id: pageId, spaceId },
         command: 'update',

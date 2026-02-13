@@ -707,6 +707,79 @@ describe('PageCommand', () => {
     expect(result.type).toBe('page')
   })
 
+  test('page update --icon on collection_view_page sets icon on collection', async () => {
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
+      if (endpoint === 'saveTransactions') {
+        expect(body.transactions[0].operations.length).toBe(1)
+        expect(body.transactions[0].operations[0].command).toBe('set')
+        expect(body.transactions[0].operations[0].pointer.table).toBe('collection')
+        expect(body.transactions[0].operations[0].pointer.id).toBe('collection-1')
+        expect(body.transactions[0].operations[0].path).toEqual(['icon'])
+        expect(body.transactions[0].operations[0].args).toBe('🚀')
+        return {}
+      }
+      if (endpoint === 'syncRecordValues') {
+        return {
+          recordMap: {
+            block: {
+              'page-1': {
+                value: {
+                  id: 'page-1',
+                  type: 'collection_view_page',
+                  collection_id: 'collection-1',
+                  space_id: 'space-123',
+                },
+                role: 'editor',
+              },
+            },
+          },
+        }
+      }
+      return {}
+    })
+
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    const mockGenerateId = mock(() => 'uuid-1')
+
+    const mockResolveSpaceId = mock(async () => 'space-123')
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mockGenerateId,
+      resolveSpaceId: mockResolveSpaceId,
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { pageCommand } = await import('./page')
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      await pageCommand.parseAsync(['update', 'page-1', '--workspace-id', 'space-123', '--icon', '🚀'], {
+        from: 'user',
+      })
+    } catch {
+      // Expected to exit
+    }
+
+    console.log = originalLog
+
+    expect(output.length).toBeGreaterThan(0)
+    const result = JSON.parse(output[0])
+    expect(result.id).toBe('page-1')
+    expect(result.type).toBe('collection_view_page')
+  })
+
   test('page archive archives page and removes from parent', async () => {
     const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
       if (endpoint === 'syncRecordValues') {
