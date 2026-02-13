@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { handleError } from '../../../shared/utils/error-handler'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { getClient } from '../client'
 import { formatDatabase, formatDatabaseListResults, formatDatabaseQueryResults } from '../formatters'
@@ -8,7 +9,8 @@ interface PrettyOption {
   pretty?: boolean
 }
 
-async function getAction(databaseId: string, options: PrettyOption): Promise<void> {
+async function getAction(rawDatabaseId: string, options: PrettyOption): Promise<void> {
+  const databaseId = formatNotionId(rawDatabaseId)
   try {
     const client = getClient()
     const result = await client.databases.retrieve({ database_id: databaseId })
@@ -19,7 +21,7 @@ async function getAction(databaseId: string, options: PrettyOption): Promise<voi
 }
 
 async function queryAction(
-  databaseId: string,
+  rawDatabaseId: string,
   options: PrettyOption & {
     filter?: string
     sort?: string
@@ -27,6 +29,7 @@ async function queryAction(
     startCursor?: string
   },
 ): Promise<void> {
+  const databaseId = formatNotionId(rawDatabaseId)
   try {
     const client = getClient()
     const body: Record<string, unknown> = {}
@@ -58,12 +61,13 @@ async function queryAction(
 async function createAction(
   options: PrettyOption & { parent: string; title: string; properties?: string },
 ): Promise<void> {
+  const parentId = formatNotionId(options.parent)
   try {
     const client = getClient()
     const properties = options.properties ? JSON.parse(options.properties) : {}
 
     const result = await client.databases.create({
-      parent: { type: 'page_id', page_id: options.parent },
+      parent: { type: 'page_id', page_id: parentId },
       title: [{ type: 'text', text: { content: options.title } }],
       properties,
     } as any)
@@ -74,9 +78,10 @@ async function createAction(
 }
 
 async function updateAction(
-  databaseId: string,
+  rawDatabaseId: string,
   options: PrettyOption & { title?: string; properties?: string },
 ): Promise<void> {
+  const databaseId = formatNotionId(rawDatabaseId)
   try {
     const client = getClient()
     const params: Record<string, unknown> = { database_id: databaseId }

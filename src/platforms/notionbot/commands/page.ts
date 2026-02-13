@@ -1,10 +1,12 @@
 import { Command } from 'commander'
 import { handleError } from '../../../shared/utils/error-handler'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { getClient } from '../client'
 import { formatPage } from '../formatters'
 
-async function getAction(pageId: string, options: { pretty?: boolean }): Promise<void> {
+async function getAction(rawPageId: string, options: { pretty?: boolean }): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const client = getClient()
     const page = await client.pages.retrieve({ page_id: pageId })
@@ -20,9 +22,10 @@ async function createAction(options: {
   database?: boolean
   pretty?: boolean
 }): Promise<void> {
+  const parentId = formatNotionId(options.parent)
   try {
     const client = getClient()
-    const parent = options.database ? { database_id: options.parent } : { page_id: options.parent }
+    const parent = options.database ? { database_id: parentId } : { page_id: parentId }
 
     const page = await client.pages.create({
       parent,
@@ -46,7 +49,11 @@ function parsePropertyPair(value: string, previous: Record<string, string>): Rec
   return { ...previous, [key]: val }
 }
 
-async function updateAction(pageId: string, options: { set: Record<string, string>; pretty?: boolean }): Promise<void> {
+async function updateAction(
+  rawPageId: string,
+  options: { set: Record<string, string>; pretty?: boolean },
+): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const client = getClient()
     const page = await client.pages.update({
@@ -59,7 +66,8 @@ async function updateAction(pageId: string, options: { set: Record<string, strin
   }
 }
 
-async function archiveAction(pageId: string, options: { pretty?: boolean }): Promise<void> {
+async function archiveAction(rawPageId: string, options: { pretty?: boolean }): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const client = getClient()
     const page = await client.pages.update({
@@ -72,7 +80,8 @@ async function archiveAction(pageId: string, options: { pretty?: boolean }): Pro
   }
 }
 
-async function propertyAction(pageId: string, propertyId: string, options: { pretty?: boolean }): Promise<void> {
+async function propertyAction(rawPageId: string, propertyId: string, options: { pretty?: boolean }): Promise<void> {
+  const pageId = formatNotionId(rawPageId)
   try {
     const client = getClient()
     const property = await client.pages.properties.retrieve({

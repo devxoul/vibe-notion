@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { handleError } from '../../../shared/utils/error-handler'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { getClient } from '../client'
 import { formatComment, formatCommentListResponse } from '../formatters'
@@ -17,7 +18,7 @@ async function listAction(options: {
 
     const client = getClient()
     const result = await client.comments.list({
-      block_id: options.page,
+      block_id: formatNotionId(options.page),
       page_size: options.pageSize,
       start_cursor: options.startCursor,
     })
@@ -56,10 +57,10 @@ async function createAction(
 
     if (options.page) {
       createParams.parent = {
-        page_id: options.page,
+        page_id: formatNotionId(options.page),
       }
     } else if (options.discussion) {
-      createParams.discussion_id = options.discussion
+      createParams.discussion_id = formatNotionId(options.discussion)
     }
 
     const result = await client.comments.create(createParams)
@@ -69,7 +70,8 @@ async function createAction(
   }
 }
 
-async function getAction(commentId: string, options: { pretty?: boolean }): Promise<void> {
+async function getAction(rawCommentId: string, options: { pretty?: boolean }): Promise<void> {
+  const commentId = formatNotionId(rawCommentId)
   try {
     const client = getClient()
     const result = await client.comments.retrieve({

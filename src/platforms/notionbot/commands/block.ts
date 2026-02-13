@@ -1,11 +1,13 @@
 import type { BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints'
 import { Command } from 'commander'
 import { handleError } from '../../../shared/utils/error-handler'
+import { formatNotionId } from '../../../shared/utils/id'
 import { formatOutput } from '../../../shared/utils/output'
 import { getClient } from '../client'
 import { formatAppendResponse, formatBlock, formatBlockChildrenResponse } from '../formatters'
 
-async function getAction(blockId: string, options: { pretty?: boolean }): Promise<void> {
+async function getAction(rawBlockId: string, options: { pretty?: boolean }): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const client = getClient()
     const block = await client.blocks.retrieve({ block_id: blockId })
@@ -16,9 +18,10 @@ async function getAction(blockId: string, options: { pretty?: boolean }): Promis
 }
 
 async function childrenAction(
-  blockId: string,
+  rawBlockId: string,
   options: { pretty?: boolean; pageSize?: string; startCursor?: string },
 ): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const client = getClient()
     const params: Record<string, unknown> = { block_id: blockId }
@@ -31,7 +34,8 @@ async function childrenAction(
   }
 }
 
-async function appendAction(parentId: string, options: { pretty?: boolean; content: string }): Promise<void> {
+async function appendAction(rawParentId: string, options: { pretty?: boolean; content: string }): Promise<void> {
+  const parentId = formatNotionId(rawParentId)
   try {
     const client = getClient()
     const children: BlockObjectRequest[] = JSON.parse(options.content)
@@ -42,7 +46,8 @@ async function appendAction(parentId: string, options: { pretty?: boolean; conte
   }
 }
 
-async function updateAction(blockId: string, options: { pretty?: boolean; content: string }): Promise<void> {
+async function updateAction(rawBlockId: string, options: { pretty?: boolean; content: string }): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const client = getClient()
     const content = JSON.parse(options.content)
@@ -53,7 +58,8 @@ async function updateAction(blockId: string, options: { pretty?: boolean; conten
   }
 }
 
-async function deleteAction(blockId: string, options: { pretty?: boolean }): Promise<void> {
+async function deleteAction(rawBlockId: string, options: { pretty?: boolean }): Promise<void> {
+  const blockId = formatNotionId(rawBlockId)
   try {
     const client = getClient()
     await client.blocks.delete({ block_id: blockId })
