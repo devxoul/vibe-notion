@@ -54,7 +54,6 @@ async function searchAction(query: string, options: SearchOptions): Promise<void
         id: r.id,
         title: r.highlight?.title || '',
         score: r.score,
-        spaceId: r.spaceId,
       })),
       total: data.total,
     }

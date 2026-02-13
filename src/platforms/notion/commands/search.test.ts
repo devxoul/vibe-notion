@@ -64,7 +64,7 @@ describe('SearchCommand', () => {
     expect(result.results[0].id).toBe('page-1')
     expect(result.results[0].title).toBe('Test Page')
     expect(result.results[0].score).toBe(0.95)
-    expect(result.results[0].spaceId).toBe('space-123')
+    expect(result.results[0].spaceId).toBeUndefined()
   })
 
   test('search with explicit workspace-id', async () => {
@@ -120,7 +120,7 @@ describe('SearchCommand', () => {
 
     expect(output.length).toBeGreaterThan(0)
     const result = JSON.parse(output[0])
-    expect(result.results[0].spaceId).toBe('space-456')
+    expect(result.results[0].spaceId).toBeUndefined()
   })
 
   test('search passes limit option', async () => {
