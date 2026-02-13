@@ -8,13 +8,13 @@ To get the full content of a page, you need to retrieve the page object and then
 
 ```bash
 # 1. Get page metadata
-agent-notion page get <page_id>
+agent-notion page get <page_id> --workspace-id <workspace_id>
 
 # 2. List direct children
-agent-notion block children <page_id>
+agent-notion block children <page_id> --workspace-id <workspace_id>
 
 # 3. For any block that has "has_children: true", fetch its children
-agent-notion block children <block_id>
+agent-notion block children <block_id> --workspace-id <workspace_id>
 ```
 
 ## 2. Querying a Database and Processing Results
@@ -23,7 +23,7 @@ Querying a database returns a list of page objects. You can filter and sort thes
 
 ```bash
 # Find all "Active" projects sorted by "Deadline"
-agent-notion database query <database_id> \
+agent-notion database query <database_id> --workspace-id <workspace_id> \
   --filter '{"property": "Status", "status": {"equals": "Active"}}' \
   --sort '[{"property": "Deadline", "direction": "ascending"}]'
 ```
@@ -34,10 +34,10 @@ Creating a page only sets the properties (like Title). To add content, you must 
 
 ```bash
 # 1. Create the page and capture the ID
-PAGE_ID=$(agent-notion page create --parent <parent_id> --title "New Document" | jq -r '.id')
+PAGE_ID=$(agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "New Document" | jq -r '.id')
 
 # 2. Append content blocks
-agent-notion block append $PAGE_ID --content '[
+agent-notion block append $PAGE_ID --workspace-id <workspace_id> --content '[
   {
     "type": "heading_1",
     "heading_1": { "rich_text": [{ "type": "text", "text": { "content": "Introduction" } }] }
@@ -54,7 +54,7 @@ agent-notion block append $PAGE_ID --content '[
 You can update multiple properties at once using the `--set` flag.
 
 ```bash
-agent-notion page update <page_id> \
+agent-notion page update <page_id> --workspace-id <workspace_id> \
   --set "Status=Done" \
   --set "Complete=true" \
   --set "Assignee=user_id"
@@ -78,8 +78,8 @@ Many list and query commands support pagination.
 
 ```bash
 # Get the first 10 results
-agent-notion database query <database_id> --page-size 10
+agent-notion database query <database_id> --workspace-id <workspace_id> --page-size 10
 
 # Get the next page using the start-cursor from the previous response
-agent-notion database query <database_id> --start-cursor "previous_next_cursor"
+agent-notion database query <database_id> --workspace-id <workspace_id> --start-cursor "previous_next_cursor"
 ```

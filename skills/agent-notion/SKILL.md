@@ -16,15 +16,20 @@ A TypeScript CLI tool that enables AI agents and humans to interact with Notion 
 # 1. Extract token_v2 from Notion desktop app
 agent-notion auth extract
 
-# 2. Search for a page
+# 2. Find your workspace ID
+agent-notion workspace list --pretty
+
+# 3. Search for a page
 agent-notion search "Roadmap" --workspace-id <workspace-id> --pretty
 
-# 3. Get page content
-agent-notion page get <page-id> --pretty
+# 4. Get page content
+agent-notion page get <page-id> --workspace-id <workspace-id> --pretty
 
-# 4. Query a database
-agent-notion database query <collection-id> --pretty
+# 5. Query a database
+agent-notion database query <collection-id> --workspace-id <workspace-id> --pretty
 ```
+
+> **Important**: `--workspace-id` is required for ALL commands that operate within a specific workspace. Use `agent-notion workspace list` to find your workspace ID.
 
 ## Authentication
 
@@ -65,62 +70,62 @@ agent-notion page list --workspace-id <workspace_id> --pretty
 agent-notion page list --workspace-id <workspace_id> --depth 2 --pretty
 
 # Get a page and all its content blocks
-agent-notion page get <page_id> --pretty
-agent-notion page get <page_id> --limit 50
+agent-notion page get <page_id> --workspace-id <workspace_id> --pretty
+agent-notion page get <page_id> --workspace-id <workspace_id> --limit 50
 
 # Create a new page under a parent
-agent-notion page create --parent <parent_id> --title "My Page" --pretty
+agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Page" --pretty
 
 # Update page title or icon
-agent-notion page update <page_id> --title "New Title" --pretty
-agent-notion page update <page_id> --icon "🚀" --pretty
+agent-notion page update <page_id> --workspace-id <workspace_id> --title "New Title" --pretty
+agent-notion page update <page_id> --workspace-id <workspace_id> --icon "🚀" --pretty
 
 # Archive a page
-agent-notion page archive <page_id> --pretty
+agent-notion page archive <page_id> --workspace-id <workspace_id> --pretty
 ```
 
 ### Database Commands
 
 ```bash
 # Get database schema
-agent-notion database get <collection_id> --pretty
+agent-notion database get <collection_id> --workspace-id <workspace_id> --pretty
 
 # Query a database (auto-resolves default view)
-agent-notion database query <collection_id> --pretty
-agent-notion database query <collection_id> --limit 10 --pretty
-agent-notion database query <collection_id> --view-id <view_id> --pretty
-agent-notion database query <collection_id> --search-query "keyword" --pretty
-agent-notion database query <collection_id> --timezone "America/New_York" --pretty
+agent-notion database query <collection_id> --workspace-id <workspace_id> --pretty
+agent-notion database query <collection_id> --workspace-id <workspace_id> --limit 10 --pretty
+agent-notion database query <collection_id> --workspace-id <workspace_id> --view-id <view_id> --pretty
+agent-notion database query <collection_id> --workspace-id <workspace_id> --search-query "keyword" --pretty
+agent-notion database query <collection_id> --workspace-id <workspace_id> --timezone "America/New_York" --pretty
 
 # List all databases in workspace
-agent-notion database list --pretty
+agent-notion database list --workspace-id <workspace_id> --pretty
 
 # Create a database
-agent-notion database create --parent <page_id> --title "Tasks" --pretty
-agent-notion database create --parent <page_id> --title "Tasks" --properties '{"status":{"name":"Status","type":"select"}}' --pretty
+agent-notion database create --workspace-id <workspace_id> --parent <page_id> --title "Tasks" --pretty
+agent-notion database create --workspace-id <workspace_id> --parent <page_id> --title "Tasks" --properties '{"status":{"name":"Status","type":"select"}}' --pretty
 
 # Update database title or schema
-agent-notion database update <collection_id> --title "New Name" --pretty
+agent-notion database update <collection_id> --workspace-id <workspace_id> --title "New Name" --pretty
 ```
 
 ### Block Commands
 
 ```bash
 # Get a specific block
-agent-notion block get <block_id> --pretty
+agent-notion block get <block_id> --workspace-id <workspace_id> --pretty
 
 # List child blocks
-agent-notion block children <block_id> --pretty
-agent-notion block children <block_id> --limit 50 --pretty
+agent-notion block children <block_id> --workspace-id <workspace_id> --pretty
+agent-notion block children <block_id> --workspace-id <workspace_id> --limit 50 --pretty
 
 # Append child blocks
-agent-notion block append <parent_id> --content '[{"type":"text","properties":{"title":[["Hello world"]]}}]' --pretty
+agent-notion block append <parent_id> --workspace-id <workspace_id> --content '[{"type":"text","properties":{"title":[["Hello world"]]}}]' --pretty
 
 # Update a block
-agent-notion block update <block_id> --content '{"properties":{"title":[["Updated text"]]}}' --pretty
+agent-notion block update <block_id> --workspace-id <workspace_id> --content '{"properties":{"title":[["Updated text"]]}}' --pretty
 
 # Delete a block
-agent-notion block delete <block_id> --pretty
+agent-notion block delete <block_id> --workspace-id <workspace_id> --pretty
 ```
 
 ### Search Command
@@ -138,7 +143,7 @@ agent-notion search "query" --workspace-id <workspace_id> --limit 10 --pretty
 agent-notion user me --pretty
 
 # Get a specific user
-agent-notion user get <user_id> --pretty
+agent-notion user get <user_id> --workspace-id <workspace_id> --pretty
 ```
 
 ## Output Format
@@ -166,7 +171,7 @@ All commands output JSON by default for AI consumption:
 Use `--pretty` flag for formatted output on any command:
 
 ```bash
-agent-notion search "Roadmap" --pretty
+agent-notion search "Roadmap" --workspace-id <workspace_id> --pretty
 ```
 
 ## Limitations
