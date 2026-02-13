@@ -1,7 +1,7 @@
 import { Command } from 'commander'
-import { handleError } from '../../../shared/utils/error-handler'
-import { formatOutput } from '../../../shared/utils/output'
-import { getClient } from '../client'
+import { getClient } from '@/platforms/notionbot/client'
+import { handleError } from '@/shared/utils/error-handler'
+import { formatOutput } from '@/shared/utils/output'
 
 async function searchAction(
   query: string,
