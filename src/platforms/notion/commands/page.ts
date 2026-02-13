@@ -1,6 +1,8 @@
 import { Command } from 'commander'
 import { internalRequest } from '@/platforms/notion/client'
 import { formatBacklinks, formatBlockRecord, formatPageGet } from '@/platforms/notion/formatters'
+import { readMarkdownInput } from '@/shared/markdown/read-input'
+import { markdownToBlocks } from '@/shared/markdown/to-notion-internal'
 import { formatNotionId } from '@/shared/utils/id'
 import { formatOutput } from '@/shared/utils/output'
 import {
@@ -15,7 +17,7 @@ import {
 type WorkspaceOptions = CommandOptions & { workspaceId: string }
 type ListPageOptions = WorkspaceOptions & { depth?: string }
 type LoadPageChunkOptions = WorkspaceOptions & { limit?: string; backlinks?: boolean }
-type CreatePageOptions = WorkspaceOptions & { parent: string; title: string }
+type CreatePageOptions = WorkspaceOptions & { parent: string; title: string; markdown?: string; markdownFile?: string }
 type UpdatePageOptions = WorkspaceOptions & { title?: string; icon?: string }
 type ArchivePageOptions = WorkspaceOptions
 
@@ -246,6 +248,48 @@ async function createAction(options: CreatePageOptions): Promise<void> {
       transactions: [{ id: generateId(), spaceId, operations }],
     })
 
+    if (options.markdown || options.markdownFile) {
+      const markdown = readMarkdownInput({ markdown: options.markdown, markdownFile: options.markdownFile })
+      const blockDefs = markdownToBlocks(markdown)
+
+      if (blockDefs.length > 0) {
+        const blockOperations: BlockOperation[] = []
+
+        for (const def of blockDefs) {
+          const newBlockId = generateId()
+
+          blockOperations.push(
+            {
+              pointer: { table: 'block', id: newBlockId, spaceId },
+              command: 'set',
+              path: [],
+              args: {
+                type: def.type,
+                id: newBlockId,
+                version: 1,
+                parent_id: newPageId,
+                parent_table: 'block',
+                alive: true,
+                properties: def.properties ?? {},
+                space_id: spaceId,
+              },
+            },
+            {
+              pointer: { table: 'block', id: newPageId, spaceId },
+              command: 'listAfter',
+              path: ['content'],
+              args: { id: newBlockId },
+            },
+          )
+        }
+
+        await internalRequest(creds.token_v2, 'saveTransactions', {
+          requestId: generateId(),
+          transactions: [{ id: generateId(), spaceId, operations: blockOperations }],
+        })
+      }
+    }
+
     const created = (await internalRequest(creds.token_v2, 'syncRecordValues', {
       requests: [{ pointer: { table: 'block', id: newPageId }, version: -1 }],
     })) as SyncRecordValuesResponse
@@ -377,6 +421,8 @@ export const pageCommand = new Command('page')
       .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .requiredOption('--parent <id>', 'Parent page or block ID')
       .requiredOption('--title <title>', 'Page title')
+      .option('--markdown <text>', 'Markdown content for page body')
+      .option('--markdown-file <path>', 'Path to markdown file for page body')
       .option('--pretty')
       .action(createAction),
   )

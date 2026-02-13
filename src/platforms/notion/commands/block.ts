@@ -1,6 +1,8 @@
 import { Command } from 'commander'
 import { internalRequest } from '@/platforms/notion/client'
 import { formatBacklinks, formatBlockChildren, formatBlockValue } from '@/platforms/notion/formatters'
+import { readMarkdownInput } from '@/shared/markdown/read-input'
+import { markdownToBlocks } from '@/shared/markdown/to-notion-internal'
 import { formatNotionId } from '@/shared/utils/id'
 import { formatOutput } from '@/shared/utils/output'
 import {
@@ -77,7 +79,9 @@ type ChildListOptions = WorkspaceOptions & {
 }
 
 type AppendOptions = WorkspaceOptions & {
-  content: string
+  content?: string
+  markdown?: string
+  markdownFile?: string
 }
 
 type UpdateOptions = WorkspaceOptions & {
@@ -229,7 +233,26 @@ function parsePageChunkCursor(rawCursor: string | undefined): { stack: unknown[]
 async function appendAction(rawParentId: string, options: AppendOptions): Promise<void> {
   const parentId = formatNotionId(rawParentId)
   try {
-    const defs = parseBlockDefinitions(options.content)
+    const hasContent = options.content !== undefined
+    const hasMarkdown = options.markdown !== undefined || options.markdownFile !== undefined
+
+    if (hasContent && hasMarkdown) {
+      throw new Error('--content and --markdown/--markdown-file are mutually exclusive')
+    }
+
+    if (!hasContent && !hasMarkdown) {
+      throw new Error('Provide either --content or --markdown/--markdown-file')
+    }
+
+    let defs: BlockDefinition[]
+
+    if (hasMarkdown) {
+      const markdown = readMarkdownInput({ markdown: options.markdown, markdownFile: options.markdownFile })
+      defs = markdownToBlocks(markdown)
+    } else {
+      defs = parseBlockDefinitions(options.content!)
+    }
+
     if (defs.length === 0) {
       throw new Error('Content must include at least one block definition')
     }
@@ -398,7 +421,9 @@ export const blockCommand = new Command('block')
       .description('Append child blocks')
       .argument('<parent_id>', 'Parent block ID')
       .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
-      .requiredOption('--content <json>', 'Block definitions as JSON array')
+      .option('--content <json>', 'Block definitions as JSON array')
+      .option('--markdown <text>', 'Markdown content to convert to blocks')
+      .option('--markdown-file <path>', 'Path to markdown file')
       .option('--pretty', 'Pretty print JSON output')
       .action(appendAction),
   )

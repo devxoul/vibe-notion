@@ -450,9 +450,9 @@ describe('PageCommand', () => {
       internalRequest: mockInternalRequest,
     }))
     mock.module('./helpers', () => ({
-      getCredentialsOrExit: mock(async () => ({ token_v2: 'test-token' })),
-      generateId: mock(() => 'uuid-1'),
-      resolveSpaceId: mock(async () => 'space-123'),
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mockGenerateId,
+      resolveSpaceId: mockResolveSpaceId,
       resolveCollectionViewId: mock(async () => 'view-mock'),
       resolveAndSetActiveUserId: mock(async () => {}),
       resolveBacklinkUsers: mock(async () => ({})),
@@ -1043,5 +1043,106 @@ describe('PageCommand', () => {
     const errorMsg = JSON.parse(errorOutput[0])
     expect(errorMsg.error).toBe('Failed to archive page')
     expect(exitCode).toBe(1)
+  })
+
+  test('page create with markdown appends blocks to new page', async () => {
+    let saveTransactionsCalls = 0
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
+      if (endpoint === 'saveTransactions') {
+        saveTransactionsCalls++
+        if (saveTransactionsCalls === 1) {
+          expect(body.transactions[0].operations.length).toBe(2)
+          expect(body.transactions[0].operations[0].command).toBe('set')
+          expect(body.transactions[0].operations[0].args.type).toBe('page')
+        } else if (saveTransactionsCalls === 2) {
+          expect(body.transactions[0].operations.length).toBeGreaterThan(0)
+          const setOp = body.transactions[0].operations.find((op: any) => op.command === 'set')
+          expect(setOp.args.type).toBe('header')
+          expect(setOp.args.properties.title).toEqual([['Hello World']])
+        }
+        return {}
+      }
+      if (endpoint === 'syncRecordValues') {
+        return {
+          recordMap: {
+            block: {
+              'uuid-1': {
+                value: {
+                  id: 'uuid-1',
+                  type: 'page',
+                  parent_id: 'parent-page',
+                  space_id: 'space-123',
+                  properties: {
+                    title: [['New Page']],
+                  },
+                },
+                role: 'editor',
+              },
+            },
+          },
+        }
+      }
+      return {}
+    })
+
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    const mockGenerateId = mock(() => 'uuid-1')
+
+    const mockResolveSpaceId = mock(async () => 'space-123')
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mockGenerateId,
+      resolveSpaceId: mockResolveSpaceId,
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { pageCommand } = await import('./page')
+    const output: string[] = []
+    const errors: string[] = []
+    const originalLog = console.log
+    const originalError = console.error
+    console.log = (msg: string) => output.push(msg)
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      await pageCommand.parseAsync(
+        [
+          'create',
+          '--workspace-id',
+          'space-123',
+          '--parent',
+          'parent-page',
+          '--title',
+          'New Page',
+          '--markdown',
+          '# Hello World',
+        ],
+        {
+          from: 'user',
+        },
+      )
+    } catch {
+      // Expected to exit
+    }
+
+    console.log = originalLog
+    console.error = originalError
+
+    if (errors.length > 0) {
+      console.error('Test errors:', errors)
+    }
+
+    expect(output.length).toBeGreaterThan(0)
+    expect(saveTransactionsCalls).toBe(2)
   })
 })

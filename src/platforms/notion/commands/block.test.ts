@@ -709,6 +709,235 @@ describe('blockCommand', () => {
       const errorMsg = JSON.parse(errors[0])
       expect(errorMsg.error).toContain('type')
     })
+
+    test('creates blocks from markdown string', async () => {
+      // Given
+      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'new-block-id')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+        resolveBacklinkUsers: mock(async () => ({})),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const output: string[] = []
+      const originalLog = console.log
+      console.log = (msg: string) => output.push(msg)
+
+      try {
+        // When
+        await blockCommand.parseAsync(
+          ['append', 'parent-1', '--workspace-id', 'space-123', '--markdown', '# Hello World'],
+          { from: 'user' },
+        )
+      } catch {
+        // Expected to exit
+      }
+
+      console.log = originalLog
+
+      // Then
+      expect(output.length).toBeGreaterThan(0)
+      const result = JSON.parse(output[0])
+      expect(result.created).toBeDefined()
+      expect(result.created.length).toBe(1)
+      expect(mockInternalRequest).toHaveBeenCalledWith(
+        'test-token',
+        'saveTransactions',
+        expect.objectContaining({
+          transactions: expect.arrayContaining([
+            expect.objectContaining({
+              operations: expect.arrayContaining([
+                expect.objectContaining({
+                  command: 'set',
+                  args: expect.objectContaining({
+                    type: 'header',
+                    properties: expect.objectContaining({
+                      title: [['Hello World']],
+                    }),
+                  }),
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      )
+    })
+
+    test('creates blocks from markdown file', async () => {
+      // Given
+      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'new-block-id')
+      const mockReadFileSync = mock(() => '# From File\n\nParagraph text')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+        resolveBacklinkUsers: mock(async () => ({})),
+      }))
+
+      mock.module('@/shared/markdown/read-input', () => ({
+        readMarkdownInput: mock(() => '# From File\n\nParagraph text'),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const output: string[] = []
+      const originalLog = console.log
+      console.log = (msg: string) => output.push(msg)
+
+      try {
+        // When
+        await blockCommand.parseAsync(
+          ['append', 'parent-1', '--workspace-id', 'space-123', '--markdown-file', '/tmp/test.md'],
+          { from: 'user' },
+        )
+      } catch {
+        // Expected to exit
+      }
+
+      console.log = originalLog
+
+      // Then
+      expect(output.length).toBeGreaterThan(0)
+      const result = JSON.parse(output[0])
+      expect(result.created).toBeDefined()
+      expect(result.created.length).toBe(2)
+    })
+
+    test('errors when both --markdown and --content provided', async () => {
+      // Given
+      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'mock-uuid')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+        resolveBacklinkUsers: mock(async () => ({})),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const errors: string[] = []
+      const originalError = console.error
+      console.error = (msg: string) => errors.push(msg)
+
+      const mockExit = mock(() => {
+        throw new Error('process.exit called')
+      })
+      const originalExit = process.exit
+      process.exit = mockExit as any
+
+      try {
+        // When
+        await blockCommand.parseAsync(
+          [
+            'append',
+            'parent-1',
+            '--workspace-id',
+            'space-123',
+            '--content',
+            JSON.stringify([{ type: 'text' }]),
+            '--markdown',
+            '# Hello',
+          ],
+          { from: 'user' },
+        )
+      } catch {
+        // Expected
+      }
+
+      console.error = originalError
+      process.exit = originalExit
+
+      // Then
+      expect(errors.length).toBeGreaterThan(0)
+      const errorMsg = JSON.parse(errors[0])
+      expect(errorMsg.error).toContain('mutually exclusive')
+    })
+
+    test('errors when markdown file does not exist', async () => {
+      // Given
+      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'mock-uuid')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+        resolveBacklinkUsers: mock(async () => ({})),
+      }))
+
+      mock.module('@/shared/markdown/read-input', () => ({
+        readMarkdownInput: mock(() => {
+          throw new Error('ENOENT: no such file or directory')
+        }),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const errors: string[] = []
+      const originalError = console.error
+      console.error = (msg: string) => errors.push(msg)
+
+      const mockExit = mock(() => {
+        throw new Error('process.exit called')
+      })
+      const originalExit = process.exit
+      process.exit = mockExit as any
+
+      try {
+        // When
+        await blockCommand.parseAsync(
+          ['append', 'parent-1', '--workspace-id', 'space-123', '--markdown-file', '/nonexistent/file.md'],
+          { from: 'user' },
+        )
+      } catch {
+        // Expected
+      }
+
+      console.error = originalError
+      process.exit = originalExit
+
+      // Then
+      expect(errors.length).toBeGreaterThan(0)
+      const errorMsg = JSON.parse(errors[0])
+      expect(errorMsg.error).toBeDefined()
+    })
   })
 
   describe('block update', () => {
