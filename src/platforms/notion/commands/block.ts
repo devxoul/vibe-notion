@@ -1,8 +1,8 @@
 import { Command } from 'commander'
-import { formatNotionId } from '../../../shared/utils/id'
-import { formatOutput } from '../../../shared/utils/output'
-import { internalRequest } from '../client'
-import { formatBlockChildren, formatBlockValue } from '../formatters'
+import { internalRequest } from '@/platforms/notion/client'
+import { formatBlockChildren, formatBlockValue } from '@/platforms/notion/formatters'
+import { formatNotionId } from '@/shared/utils/id'
+import { formatOutput } from '@/shared/utils/output'
 import {
   type CommandOptions,
   generateId,
