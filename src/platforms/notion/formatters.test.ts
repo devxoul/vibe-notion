@@ -301,21 +301,21 @@ describe('formatPageGet', () => {
 })
 
 describe('formatBacklinks', () => {
-  test('extracts backlinks with titles from response', () => {
+  test('extracts source blocks from mentioned_from.block_id', () => {
     // Given
     const response = {
       backlinks: [
-        { block_id: 'page-a', mentioned_from: { type: 'property_mention' } },
-        { block_id: 'page-b', mentioned_from: { type: 'alias' } },
+        { block_id: 'target-page', mentioned_from: { type: 'property_mention', block_id: 'source-a' } },
+        { block_id: 'target-page', mentioned_from: { type: 'alias', block_id: 'source-b' } },
       ],
       recordMap: {
         block: {
-          'page-a': {
-            value: { id: 'page-a', type: 'page', properties: { title: [['Linking Page A']] } },
+          'source-a': {
+            value: { id: 'source-a', type: 'page', properties: { title: [['Linking Page A']] } },
             role: 'editor',
           },
-          'page-b': {
-            value: { id: 'page-b', type: 'page', properties: { title: [['Linking Page B']] } },
+          'source-b': {
+            value: { id: 'source-b', type: 'page', properties: { title: [['Linking Page B']] } },
             role: 'editor',
           },
         },
@@ -327,9 +327,33 @@ describe('formatBacklinks', () => {
 
     // Then
     expect(result).toEqual([
-      { id: 'page-a', title: 'Linking Page A' },
-      { id: 'page-b', title: 'Linking Page B' },
+      { id: 'source-a', title: 'Linking Page A' },
+      { id: 'source-b', title: 'Linking Page B' },
     ])
+  })
+
+  test('deduplicates backlinks from the same source block', () => {
+    // Given
+    const response = {
+      backlinks: [
+        { block_id: 'target', mentioned_from: { type: 'property_mention', block_id: 'source-a' } },
+        { block_id: 'target', mentioned_from: { type: 'alias', block_id: 'source-a' } },
+      ],
+      recordMap: {
+        block: {
+          'source-a': {
+            value: { id: 'source-a', type: 'page', properties: { title: [['Page A']] } },
+            role: 'editor',
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatBacklinks(response)
+
+    // Then
+    expect(result).toEqual([{ id: 'source-a', title: 'Page A' }])
   })
 
   test('returns empty array when no backlinks', () => {
@@ -351,10 +375,10 @@ describe('formatBacklinks', () => {
     expect(result).toEqual([])
   })
 
-  test('skips entries without block_id', () => {
+  test('skips entries without mentioned_from.block_id', () => {
     // Given
     const response = {
-      backlinks: [{ mentioned_from: { type: 'alias' } }],
+      backlinks: [{ block_id: 'target', mentioned_from: { type: 'alias' } }],
       recordMap: { block: {} },
     }
 
@@ -365,10 +389,10 @@ describe('formatBacklinks', () => {
     expect(result).toEqual([])
   })
 
-  test('returns empty title when block not in recordMap', () => {
+  test('returns empty title when source block not in recordMap', () => {
     // Given
     const response = {
-      backlinks: [{ block_id: 'page-missing' }],
+      backlinks: [{ block_id: 'target', mentioned_from: { type: 'alias', block_id: 'source-missing' } }],
       recordMap: { block: {} },
     }
 
@@ -376,7 +400,7 @@ describe('formatBacklinks', () => {
     const result = formatBacklinks(response)
 
     // Then
-    expect(result).toEqual([{ id: 'page-missing', title: '' }])
+    expect(result).toEqual([{ id: 'source-missing', title: '' }])
   })
 })
 

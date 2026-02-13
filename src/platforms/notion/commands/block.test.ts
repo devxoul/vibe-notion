@@ -206,7 +206,10 @@ describe('blockCommand', () => {
         }
         if (endpoint === 'getBacklinksForBlock') {
           return Promise.resolve({
-            backlinks: [{ block_id: 'ref-1' }, { block_id: 'ref-2' }],
+            backlinks: [
+              { block_id: 'block-123', mentioned_from: { type: 'property_mention', block_id: 'ref-1' } },
+              { block_id: 'block-123', mentioned_from: { type: 'alias', block_id: 'ref-2' } },
+            ],
             recordMap: {
               block: {
                 'ref-1': {

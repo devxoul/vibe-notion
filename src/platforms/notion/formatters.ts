@@ -118,19 +118,23 @@ export function formatBacklinks(response: Record<string, unknown>): BacklinkEntr
   if (!Array.isArray(backlinks)) return []
 
   const blockMap = toRecordMap(toRecord(response.recordMap)?.block)
+  const seen = new Set<string>()
 
   return backlinks
     .map((entry) => {
       const record = toRecord(entry)
       if (!record) return undefined
 
-      const blockId = toOptionalString(record.block_id)
-      if (!blockId) return undefined
+      const mentionedFrom = toRecord(record.mentioned_from)
+      const sourceBlockId = toOptionalString(mentionedFrom?.block_id)
+      if (!sourceBlockId) return undefined
+      if (seen.has(sourceBlockId)) return undefined
+      seen.add(sourceBlockId)
 
-      const blockValue = getRecordValue(blockMap[blockId])
+      const blockValue = getRecordValue(blockMap[sourceBlockId])
       const title = blockValue ? extractNotionTitle(blockValue) : ''
 
-      return { id: blockId, title }
+      return { id: sourceBlockId, title }
     })
     .filter((entry): entry is BacklinkEntry => entry !== undefined)
 }

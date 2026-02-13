@@ -428,7 +428,7 @@ describe('PageCommand', () => {
       }
       if (endpoint === 'getBacklinksForBlock') {
         return {
-          backlinks: [{ block_id: 'ref-page' }],
+          backlinks: [{ block_id: 'page-1', mentioned_from: { type: 'property_mention', block_id: 'ref-page' } }],
           recordMap: {
             block: {
               'ref-page': {
