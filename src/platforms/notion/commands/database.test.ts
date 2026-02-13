@@ -115,10 +115,10 @@ describe('database get', () => {
 })
 
 describe('database query', () => {
-  test('calls resolveCollectionViewId then queryCollection endpoint', async () => {
+  test('outputs schema-based row properties from queryCollection response', async () => {
     mock.restore()
     // Given
-    const mockResponse = {
+    const mockQueryResponse = {
       result: {
         reducerResults: {
           collection_group_results: {
@@ -128,13 +128,41 @@ describe('database query', () => {
         },
       },
       recordMap: {
-        block: {},
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              properties: {
+                '@lzG': [['고래몰']],
+                'Ho]U': [['완료']],
+                SdrK: [['위젯 설치']],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                '@lzG': { name: '고객사', type: 'title' },
+                'Ho]U': { name: '상태', type: 'status' },
+                SdrK: { name: '타입', type: 'text' },
+              },
+            },
+          },
+        },
       },
     }
-    const mockInternalRequest = mock(() => Promise.resolve(mockResponse))
+    const mockInternalRequest = mock((_token: string, endpoint: string) => {
+      if (endpoint === 'queryCollection') {
+        return Promise.resolve(mockQueryResponse)
+      }
+      return Promise.resolve({})
+    })
     const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
     const mockResolveCollectionViewId = mock(() => Promise.resolve('view-123'))
-    const mockResolveSpaceId = mock(async () => 'space-123')
 
     mock.module('../client', () => ({
       internalRequest: mockInternalRequest,
@@ -143,7 +171,7 @@ describe('database query', () => {
     mock.module('./helpers', () => ({
       getCredentialsOrExit: mockGetCredentials,
       generateId: mock(() => 'mock-uuid'),
-      resolveSpaceId: mockResolveSpaceId,
+      resolveSpaceId: mock(async () => 'space-123'),
       resolveCollectionViewId: mockResolveCollectionViewId,
       resolveAndSetActiveUserId: mock(async () => {}),
     }))
@@ -165,12 +193,26 @@ describe('database query', () => {
     expect(mockResolveCollectionViewId).toHaveBeenCalledWith('test-token', 'coll-1')
     expect(mockInternalRequest).toHaveBeenCalledWith('test-token', 'queryCollection', expect.any(Object))
     expect(output.length).toBeGreaterThan(0)
+    const parsed = JSON.parse(output[0])
+    expect(parsed).toEqual({
+      results: [
+        {
+          id: 'row-1',
+          properties: {
+            고객사: '고래몰',
+            상태: '완료',
+            타입: '위젯 설치',
+          },
+        },
+      ],
+      has_more: false,
+    })
   })
 
   test('uses provided view ID instead of resolving', async () => {
     mock.restore()
     // Given
-    const mockResponse = {
+    const mockQueryResponse = {
       result: {
         reducerResults: {
           collection_group_results: {
@@ -180,10 +222,34 @@ describe('database query', () => {
         },
       },
       recordMap: {
-        block: {},
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              properties: {
+                title: [['Row Name']],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+              },
+            },
+          },
+        },
       },
     }
-    const mockInternalRequest = mock(() => Promise.resolve(mockResponse))
+    const mockInternalRequest = mock((_token: string, endpoint: string) => {
+      if (endpoint === 'queryCollection') {
+        return Promise.resolve(mockQueryResponse)
+      }
+      return Promise.resolve({})
+    })
     const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
     const mockResolveCollectionViewId = mock(() => Promise.resolve('view-123'))
     const mockResolveSpaceId = mock(async () => 'space-123')
@@ -221,8 +287,11 @@ describe('database query', () => {
     // Then
     expect(mockResolveCollectionViewId).not.toHaveBeenCalled()
     expect(mockInternalRequest.mock.calls.length).toBeGreaterThan(0)
-    const callArgs = mockInternalRequest.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
-    expect(callArgs[2]).toEqual(
+    const queryCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'queryCollection',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(queryCall).toBeDefined()
+    expect(queryCall?.[2]).toEqual(
       expect.objectContaining({
         collectionViewId: 'custom-view-id',
       }),
