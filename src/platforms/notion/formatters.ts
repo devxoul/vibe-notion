@@ -671,3 +671,68 @@ function extractDateValue(value: unknown): string | null {
   }
   return null
 }
+
+export function formatCommentValue(comment: Record<string, unknown>): {
+  id: string
+  text: string
+  discussion_id: string
+  created_by: string
+  created_time: number
+} {
+  const text = comment.text
+  let extractedText = ''
+  if (Array.isArray(text)) {
+    extractedText = (text as string[][]).map((segment: string[]) => segment[0]).join('')
+  }
+
+  return {
+    id: toStringValue(comment.id),
+    text: extractedText,
+    discussion_id: toStringValue(comment.parent_id),
+    created_by: toStringValue(comment.created_by_id),
+    created_time: typeof comment.created_time === 'number' ? comment.created_time : 0,
+  }
+}
+
+export function formatDiscussionComments(
+  discussions: Record<string, Record<string, unknown>>,
+  comments: Record<string, Record<string, unknown>>,
+  pageId: string,
+): {
+  results: Array<{ id: string; discussion_id: string; text: string; created_by: string; created_time: number }>
+  total: number
+} {
+  const results: Array<{ id: string; discussion_id: string; text: string; created_by: string; created_time: number }> =
+    []
+
+  for (const [discussionId, discussionRecord] of Object.entries(discussions)) {
+    const discussion = getRecordValue(discussionRecord)
+    if (!discussion) continue
+
+    const parentId = toStringValue(discussion.parent_id)
+    if (parentId !== pageId) continue
+
+    const commentIds = toStringArray(discussion.comments)
+    for (const commentId of commentIds) {
+      const commentRecord = comments[commentId]
+      if (!commentRecord) continue
+
+      const comment = getRecordValue(commentRecord)
+      if (!comment) continue
+
+      const formatted = formatCommentValue(comment)
+      results.push({
+        id: formatted.id,
+        discussion_id: discussionId,
+        text: formatted.text,
+        created_by: formatted.created_by,
+        created_time: formatted.created_time,
+      })
+    }
+  }
+
+  return {
+    results,
+    total: results.length,
+  }
+}

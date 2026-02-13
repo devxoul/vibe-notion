@@ -1,5 +1,6 @@
 export { authCommand } from './auth'
 export { blockCommand } from './block'
+export { commentCommand } from './comment'
 export { databaseCommand } from './database'
 export { pageCommand } from './page'
 export { searchCommand } from './search'

@@ -6,6 +6,7 @@ import { setActiveUserId } from './client'
 import {
   authCommand,
   blockCommand,
+  commentCommand,
   databaseCommand,
   pageCommand,
   searchCommand,
@@ -31,6 +32,7 @@ program
 
 program.addCommand(authCommand)
 program.addCommand(blockCommand)
+program.addCommand(commentCommand)
 program.addCommand(databaseCommand)
 program.addCommand(pageCommand)
 program.addCommand(searchCommand)
