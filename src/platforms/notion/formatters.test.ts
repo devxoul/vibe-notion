@@ -13,6 +13,9 @@ import {
   formatBlockUpdate,
   formatBlockValue,
   formatCollectionValue,
+  formatCommentAttachment,
+  formatCommentValue,
+  formatDiscussionComments,
   formatPageGet,
   formatQueryCollectionResponse,
   formatUserValue,
@@ -1491,5 +1494,312 @@ describe('enrichProperties', () => {
       value: 'user-unknown',
       mentions: [{ id: 'user-unknown', type: 'user', name: 'user-unknown' }],
     })
+  })
+})
+
+describe('formatCommentAttachment', () => {
+  test('extracts image attachment from block', () => {
+    // Given
+    const block = {
+      id: 'block-img',
+      type: 'image',
+      properties: {
+        title: [['screenshot.png']],
+        source: [['attachment:abc-123:screenshot.png']],
+        size: [['481.8 KiB']],
+      },
+    }
+
+    // When
+    const result = formatCommentAttachment(block)
+
+    // Then
+    expect(result).toEqual({
+      id: 'block-img',
+      type: 'image',
+      name: 'screenshot.png',
+      source: 'attachment:abc-123:screenshot.png',
+    })
+  })
+
+  test('extracts file attachment from block', () => {
+    // Given
+    const block = {
+      id: 'block-file',
+      type: 'file',
+      properties: {
+        title: [['document.pptx']],
+        source: [['attachment:def-456:document.pptx']],
+        size: [['5.2 MiB']],
+      },
+    }
+
+    // When
+    const result = formatCommentAttachment(block)
+
+    // Then
+    expect(result).toEqual({
+      id: 'block-file',
+      type: 'file',
+      name: 'document.pptx',
+      source: 'attachment:def-456:document.pptx',
+    })
+  })
+
+  test('returns undefined for non-attachment block types', () => {
+    // Given
+    const block = {
+      id: 'block-text',
+      type: 'text',
+      properties: { title: [['Hello']] },
+    }
+
+    // When
+    const result = formatCommentAttachment(block)
+
+    // Then
+    expect(result).toBeUndefined()
+  })
+
+  test('returns undefined when properties are missing', () => {
+    // Given
+    const block = { id: 'block-img', type: 'image' }
+
+    // When
+    const result = formatCommentAttachment(block)
+
+    // Then
+    expect(result).toBeUndefined()
+  })
+})
+
+describe('formatCommentValue', () => {
+  test('extracts text from comment', () => {
+    // Given
+    const comment = {
+      id: 'comment-1',
+      text: [['Hello world']],
+      parent_id: 'disc-1',
+      created_by_id: 'user-1',
+      created_time: 1704067200000,
+    }
+
+    // When
+    const result = formatCommentValue(comment)
+
+    // Then
+    expect(result).toEqual({
+      id: 'comment-1',
+      text: 'Hello world',
+      discussion_id: 'disc-1',
+      created_by: 'user-1',
+      created_time: 1704067200000,
+    })
+  })
+
+  test('joins multi-segment text', () => {
+    // Given
+    const comment = {
+      id: 'comment-1',
+      text: [['Hello '], ['world']],
+      parent_id: 'disc-1',
+      created_by_id: 'user-1',
+      created_time: 1704067200000,
+    }
+
+    // When
+    const result = formatCommentValue(comment)
+
+    // Then
+    expect(result.text).toBe('Hello world')
+  })
+
+  test('preserves mention pointer character in text', () => {
+    // Given
+    const comment = {
+      id: 'comment-1',
+      text: [['‣', [['u', 'user-123']]], [' hello']],
+      parent_id: 'disc-1',
+      created_by_id: 'user-1',
+      created_time: 1704067200000,
+    }
+
+    // When
+    const result = formatCommentValue(comment)
+
+    // Then
+    expect(result.text).toBe('‣ hello')
+  })
+
+  test('includes attachments when blocks are provided', () => {
+    // Given
+    const comment = {
+      id: 'comment-1',
+      text: [['Check this']],
+      parent_id: 'disc-1',
+      created_by_id: 'user-1',
+      created_time: 1704067200000,
+      content: ['block-img-1', 'block-file-1'],
+    }
+    const blocks: Record<string, Record<string, unknown>> = {
+      'block-img-1': {
+        value: {
+          id: 'block-img-1',
+          type: 'image',
+          properties: {
+            title: [['screenshot.png']],
+            source: [['attachment:abc:screenshot.png']],
+          },
+        },
+        role: 'editor',
+      },
+      'block-file-1': {
+        value: {
+          id: 'block-file-1',
+          type: 'file',
+          properties: {
+            title: [['doc.pdf']],
+            source: [['attachment:def:doc.pdf']],
+          },
+        },
+        role: 'editor',
+      },
+    }
+
+    // When
+    const result = formatCommentValue(comment, blocks)
+
+    // Then
+    expect(result.attachments).toEqual([
+      { id: 'block-img-1', type: 'image', name: 'screenshot.png', source: 'attachment:abc:screenshot.png' },
+      { id: 'block-file-1', type: 'file', name: 'doc.pdf', source: 'attachment:def:doc.pdf' },
+    ])
+  })
+
+  test('omits attachments when comment has no content', () => {
+    // Given
+    const comment = {
+      id: 'comment-1',
+      text: [['No attachments']],
+      parent_id: 'disc-1',
+      created_by_id: 'user-1',
+      created_time: 1704067200000,
+    }
+
+    // When
+    const result = formatCommentValue(comment)
+
+    // Then
+    expect('attachments' in result).toBe(false)
+  })
+
+  test('omits attachments when blocks are not provided', () => {
+    // Given
+    const comment = {
+      id: 'comment-1',
+      text: [['Has content']],
+      parent_id: 'disc-1',
+      created_by_id: 'user-1',
+      created_time: 1704067200000,
+      content: ['block-1'],
+    }
+
+    // When
+    const result = formatCommentValue(comment)
+
+    // Then
+    expect('attachments' in result).toBe(false)
+  })
+})
+
+describe('formatDiscussionComments with attachments', () => {
+  test('includes attachments from block recordMap', () => {
+    // Given
+    const discussions: Record<string, Record<string, unknown>> = {
+      'disc-1': {
+        value: {
+          value: {
+            id: 'disc-1',
+            parent_id: 'page-1',
+            comments: ['comment-1'],
+          },
+          role: 'editor',
+        },
+      },
+    }
+    const comments: Record<string, Record<string, unknown>> = {
+      'comment-1': {
+        value: {
+          value: {
+            id: 'comment-1',
+            text: [['See attached']],
+            parent_id: 'disc-1',
+            created_by_id: 'user-1',
+            created_time: 1704067200000,
+            content: ['block-img'],
+          },
+          role: 'editor',
+        },
+      },
+    }
+    const blocks: Record<string, Record<string, unknown>> = {
+      'block-img': {
+        value: {
+          value: {
+            id: 'block-img',
+            type: 'image',
+            properties: {
+              title: [['photo.png']],
+              source: [['attachment:xyz:photo.png']],
+            },
+          },
+          role: 'editor',
+        },
+      },
+    }
+
+    // When
+    const result = formatDiscussionComments(discussions, comments, 'page-1', blocks)
+
+    // Then
+    expect(result.results[0].attachments).toEqual([
+      { id: 'block-img', type: 'image', name: 'photo.png', source: 'attachment:xyz:photo.png' },
+    ])
+  })
+
+  test('omits attachments field for comments without content', () => {
+    // Given
+    const discussions: Record<string, Record<string, unknown>> = {
+      'disc-1': {
+        value: {
+          value: {
+            id: 'disc-1',
+            parent_id: 'page-1',
+            comments: ['comment-1'],
+          },
+          role: 'editor',
+        },
+      },
+    }
+    const comments: Record<string, Record<string, unknown>> = {
+      'comment-1': {
+        value: {
+          value: {
+            id: 'comment-1',
+            text: [['Plain text']],
+            parent_id: 'disc-1',
+            created_by_id: 'user-1',
+            created_time: 1704067200000,
+          },
+          role: 'editor',
+        },
+      },
+    }
+
+    // When
+    const result = formatDiscussionComments(discussions, comments, 'page-1', {})
+
+    // Then
+    expect('attachments' in result.results[0]).toBe(false)
   })
 })

@@ -672,17 +672,63 @@ function extractDateValue(value: unknown): string | null {
   return null
 }
 
-export function formatCommentValue(comment: Record<string, unknown>): {
+export type CommentAttachment = {
+  id: string
+  type: string
+  name: string
+  source: string
+}
+
+export function formatCommentAttachment(block: Record<string, unknown>): CommentAttachment | undefined {
+  const type = toStringValue(block.type)
+  if (type !== 'image' && type !== 'file') return undefined
+
+  const properties = toRecord(block.properties)
+  if (!properties) return undefined
+
+  const name = extractPropertyText(properties.title)
+  const source = extractPropertyText(properties.source)
+
+  return {
+    id: toStringValue(block.id),
+    type,
+    name,
+    source,
+  }
+}
+
+export function formatCommentValue(
+  comment: Record<string, unknown>,
+  blocks?: Record<string, Record<string, unknown>>,
+): {
   id: string
   text: string
   discussion_id: string
   created_by: string
   created_time: number
+  attachments?: CommentAttachment[]
 } {
   const text = comment.text
   let extractedText = ''
   if (Array.isArray(text)) {
-    extractedText = (text as string[][]).map((segment: string[]) => segment[0]).join('')
+    extractedText = extractCommentText(text)
+  }
+
+  const contentIds = toStringArray(comment.content)
+  let attachments: CommentAttachment[] | undefined
+  if (contentIds.length > 0 && blocks) {
+    const resolved = contentIds
+      .map((id) => {
+        const blockRecord = blocks[id]
+        if (!blockRecord) return undefined
+        const blockValue = getRecordValue(blockRecord)
+        if (!blockValue) return undefined
+        return formatCommentAttachment(blockValue)
+      })
+      .filter((a): a is CommentAttachment => a !== undefined)
+    if (resolved.length > 0) {
+      attachments = resolved
+    }
   }
 
   return {
@@ -691,19 +737,41 @@ export function formatCommentValue(comment: Record<string, unknown>): {
     discussion_id: toStringValue(comment.parent_id),
     created_by: toStringValue(comment.created_by_id),
     created_time: typeof comment.created_time === 'number' ? comment.created_time : 0,
+    ...(attachments ? { attachments } : {}),
   }
+}
+
+function extractCommentText(segments: unknown[]): string {
+  const parts: string[] = []
+  for (const segment of segments) {
+    if (!Array.isArray(segment) || segment.length === 0) continue
+    const text = segment[0]
+    if (typeof text === 'string') {
+      parts.push(text)
+    }
+  }
+  return parts.join('')
+}
+
+type FormattedComment = {
+  id: string
+  discussion_id: string
+  text: string
+  created_by: string
+  created_time: number
+  attachments?: CommentAttachment[]
 }
 
 export function formatDiscussionComments(
   discussions: Record<string, Record<string, unknown>>,
   comments: Record<string, Record<string, unknown>>,
   pageId: string,
+  blocks?: Record<string, Record<string, unknown>>,
 ): {
-  results: Array<{ id: string; discussion_id: string; text: string; created_by: string; created_time: number }>
+  results: FormattedComment[]
   total: number
 } {
-  const results: Array<{ id: string; discussion_id: string; text: string; created_by: string; created_time: number }> =
-    []
+  const results: FormattedComment[] = []
 
   for (const [discussionId, discussionRecord] of Object.entries(discussions)) {
     const discussion = getRecordValue(discussionRecord)
@@ -720,14 +788,18 @@ export function formatDiscussionComments(
       const comment = getRecordValue(commentRecord)
       if (!comment) continue
 
-      const formatted = formatCommentValue(comment)
-      results.push({
+      const formatted = formatCommentValue(comment, blocks)
+      const entry: FormattedComment = {
         id: formatted.id,
         discussion_id: discussionId,
         text: formatted.text,
         created_by: formatted.created_by,
         created_time: formatted.created_time,
-      })
+      }
+      if (formatted.attachments) {
+        entry.attachments = formatted.attachments
+      }
+      results.push(entry)
     }
   }
 

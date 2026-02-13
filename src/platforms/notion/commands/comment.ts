@@ -45,6 +45,7 @@ type GetOptions = CommandOptions & {
 
 type LoadPageChunkResponse = {
   recordMap: {
+    block?: Record<string, Record<string, unknown>>
     discussion?: Record<string, Record<string, unknown>>
     comment?: Record<string, Record<string, unknown>>
   }
@@ -87,10 +88,11 @@ async function listAction(options: ListOptions): Promise<void> {
       verticalColumns: false,
     })) as LoadPageChunkResponse
 
+    const blocks = response.recordMap.block ?? {}
     const discussions = response.recordMap.discussion ?? {}
     const comments = response.recordMap.comment ?? {}
 
-    const result = formatDiscussionComments(discussions, comments, pageId)
+    const result = formatDiscussionComments(discussions, comments, pageId, blocks)
     console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
@@ -254,7 +256,19 @@ async function getAction(commentId: string, options: GetOptions): Promise<void> 
       throw new Error(`Comment not found: ${commentId}`)
     }
 
-    const result = formatCommentValue(comment)
+    const contentIds = Array.isArray(comment.content)
+      ? (comment.content as string[]).filter((id): id is string => typeof id === 'string')
+      : []
+
+    let blocks: Record<string, Record<string, unknown>> | undefined
+    if (contentIds.length > 0) {
+      const blockResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
+        requests: contentIds.map((id) => ({ pointer: { table: 'block', id }, version: -1 })),
+      })) as { recordMap: { block?: Record<string, Record<string, unknown>> } }
+      blocks = blockResponse.recordMap.block
+    }
+
+    const result = formatCommentValue(comment, blocks)
     console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
