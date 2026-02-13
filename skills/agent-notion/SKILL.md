@@ -152,6 +152,10 @@ agent-notion user get <user_id> --workspace-id <workspace_id> --pretty
 
 All commands output JSON by default for AI consumption:
 
+```bash
+# Search results
+agent-notion search "Roadmap" --workspace-id <workspace_id>
+```
 ```json
 {
   "results": [
@@ -163,6 +167,41 @@ All commands output JSON by default for AI consumption:
     }
   ],
   "total": 1
+}
+```
+
+```bash
+# Database query — properties use human-readable field names from the collection schema
+agent-notion database query <collection_id> --workspace-id <workspace_id>
+```
+```json
+{
+  "results": [
+    {
+      "id": "row-uuid",
+      "properties": {
+        "Name": "Acme Corp",
+        "Status": "Active",
+        "Type": "Enterprise"
+      }
+    }
+  ],
+  "has_more": false
+}
+```
+
+```bash
+# Block get — collection_view blocks include collection_id and view_ids
+agent-notion block get <block_id> --workspace-id <workspace_id>
+```
+```json
+{
+  "id": "block-uuid",
+  "type": "collection_view",
+  "text": "",
+  "parent_id": "parent-uuid",
+  "collection_id": "collection-uuid",
+  "view_ids": ["view-uuid"]
 }
 ```
 
