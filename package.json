@@ -29,6 +29,14 @@
     "remark-parse": "^11.0.0",
     "unified": "^11.0.5"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devxoul/agent-notion.git"
+  },
+  "license": "MIT",
   "devDependencies": {
     "@biomejs/biome": "latest",
     "@types/better-sqlite3": "latest",
