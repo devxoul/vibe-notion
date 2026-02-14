@@ -51,9 +51,6 @@ jobs:
           git tag "${{ inputs.version }}"
           git push origin HEAD --tags
 
-      - name: Build
-        run: bun run build
-
       - name: Publish to npm
         run: npm publish --provenance --access public
         env:

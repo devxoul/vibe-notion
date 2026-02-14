@@ -18,7 +18,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write --unsafe .",
     "format": "biome format --write .",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run build && bun scripts/prepublish.ts",
+    "postpublish": "git checkout package.json"
   },
   "dependencies": {
     "@notionhq/client": "latest",
