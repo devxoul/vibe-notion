@@ -10,4 +10,4 @@ DATABASE_ID=$1
 
 # Query the database
 # Note: This assumes results have a 'properties.Name.title' field which is common
-agent-notion database query "$DATABASE_ID" --pretty
+vibe-notion database query "$DATABASE_ID" --pretty

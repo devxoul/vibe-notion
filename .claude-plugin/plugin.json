@@ -1,5 +1,5 @@
 {
-  "name": "agent-notion",
+  "name": "vibe-notion",
   "version": "0.1.0",
   "description": "Notion API interaction skill for AI agents. Manage pages, databases, blocks, search, and comments through a simple CLI interface.",
   "author": {
@@ -17,9 +17,9 @@
     "productivity",
     "knowledge-base"
   ],
-  "homepage": "https://github.com/devxoul/agent-notion",
-  "repository": "https://github.com/devxoul/agent-notion",
+  "homepage": "https://github.com/devxoul/vibe-notion",
+  "repository": "https://github.com/devxoul/vibe-notion",
   "skills": [
-    "./skills/agent-notion"
+    "./skills/vibe-notion"
   ]
 }

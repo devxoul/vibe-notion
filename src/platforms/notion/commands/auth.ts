@@ -42,7 +42,7 @@ async function extractAction(options: CommandOptions): Promise<void> {
       console.log('  What happens:')
       console.log("    1. We read the encrypted cookie from Notion's local storage")
       console.log('    2. macOS Keychain decrypts it (requires your password)')
-      console.log('    3. The token is stored locally in ~/.config/agent-notion/')
+      console.log('    3. The token is stored locally in ~/.config/vibe-notion/')
       console.log('')
       console.log('  Your password is never stored or transmitted anywhere.')
       console.log('')

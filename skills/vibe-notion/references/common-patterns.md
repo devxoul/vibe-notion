@@ -1,4 +1,4 @@
-# Common Patterns for Agent Notion
+# Common Patterns for Vibe Notion
 
 This document outlines common workflows and patterns for interacting with Notion via the CLI.
 
@@ -8,13 +8,13 @@ To get the full content of a page, you need to retrieve the page object and then
 
 ```bash
 # 1. Get page metadata
-agent-notion page get <page_id> --workspace-id <workspace_id>
+vibe-notion page get <page_id> --workspace-id <workspace_id>
 
 # 2. List direct children
-agent-notion block children <page_id> --workspace-id <workspace_id>
+vibe-notion block children <page_id> --workspace-id <workspace_id>
 
 # 3. For any block that has "has_children: true", fetch its children
-agent-notion block children <block_id> --workspace-id <workspace_id>
+vibe-notion block children <block_id> --workspace-id <workspace_id>
 ```
 
 ## 2. Querying a Database and Processing Results
@@ -23,7 +23,7 @@ Querying a database returns a list of page objects. You can filter and sort thes
 
 ```bash
 # Find all "Active" projects sorted by "Deadline"
-agent-notion database query <database_id> --workspace-id <workspace_id> \
+vibe-notion database query <database_id> --workspace-id <workspace_id> \
   --filter '{"property": "Status", "status": {"equals": "Active"}}' \
   --sort '[{"property": "Deadline", "direction": "ascending"}]'
 ```
@@ -34,10 +34,10 @@ Creating a page only sets the properties (like Title). To add content, you must 
 
 ```bash
 # 1. Create the page and capture the ID
-PAGE_ID=$(agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "New Document" | jq -r '.id')
+PAGE_ID=$(vibe-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "New Document" | jq -r '.id')
 
 # 2. Append content blocks
-agent-notion block append $PAGE_ID --workspace-id <workspace_id> --content '[
+vibe-notion block append $PAGE_ID --workspace-id <workspace_id> --content '[
   {"type": "header", "properties": {"title": [["Introduction"]]}},
   {"type": "text", "properties": {"title": [["This is a new page created via CLI."]]}}
 ]'
@@ -49,15 +49,15 @@ Use the `--markdown` flag to append or create pages with markdown content.
 
 ```bash
 # Append markdown content to an existing page
-agent-notion block append <page_id> --workspace-id <workspace_id> --markdown '# Introduction
+vibe-notion block append <page_id> --workspace-id <workspace_id> --markdown '# Introduction
 
 This is a new page created via CLI.'
 
 # Create a page with markdown content from a file
-agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "New Document" --markdown-file ./content.md
+vibe-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "New Document" --markdown-file ./content.md
 
 # Replace all content on a page with new markdown
-agent-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown-file ./updated.md
+vibe-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown-file ./updated.md
 ```
 
 ## 5. Updating Multiple Properties
@@ -65,7 +65,7 @@ agent-notion page update <page_id> --workspace-id <workspace_id> --replace-conte
 You can update multiple properties at once using the `--set` flag.
 
 ```bash
-agent-notion page update <page_id> --workspace-id <workspace_id> \
+vibe-notion page update <page_id> --workspace-id <workspace_id> \
   --set "Status=Done" \
   --set "Complete=true" \
   --set "Assignee=user_id"
@@ -77,10 +77,10 @@ Search is the best way to find objects when you don't have their IDs.
 
 ```bash
 # Search for databases only
-agent-notion search "Inventory" --workspace-id <workspace_id> --filter database
+vibe-notion search "Inventory" --workspace-id <workspace_id> --filter database
 
 # Search for pages modified recently
-agent-notion search "Meeting Notes" --workspace-id <workspace_id> --filter page --sort desc
+vibe-notion search "Meeting Notes" --workspace-id <workspace_id> --filter page --sort desc
 ```
 
 ## 7. Handling Pagination
@@ -89,8 +89,8 @@ Many list and query commands support pagination.
 
 ```bash
 # Get the first 10 results
-agent-notion database query <database_id> --workspace-id <workspace_id> --page-size 10
+vibe-notion database query <database_id> --workspace-id <workspace_id> --page-size 10
 
 # Get the next page using the start-cursor from the previous response
-agent-notion database query <database_id> --workspace-id <workspace_id> --start-cursor "previous_next_cursor"
+vibe-notion database query <database_id> --workspace-id <workspace_id> --start-cursor "previous_next_cursor"
 ```

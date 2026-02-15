@@ -1,17 +1,17 @@
-# Agent Notion
+# Vibe Notion
 
 **Give your AI agent the power to read and write Notion pages, databases, and more**
 
-A full-coverage, agent-friendly CLI for the Notion API. Ships two CLIs — `agent-notion` for the unofficial private API (act as yourself) and `agent-notionbot` for the official Integration API (act as a bot).
+A full-coverage, agent-friendly CLI for the Notion API. Ships two CLIs — `vibe-notion` for the unofficial private API (act as yourself) and `vibe-notionbot` for the official Integration API (act as a bot).
 
-## ✨ Why Agent Notion?
+## ✨ Why Vibe Notion?
 
-Notion's official API only supports Integration (bot) tokens — your agent can't do things **on behalf of you**. Agent Notion solves this by extracting your `token_v2` from the Notion desktop app, so your agent operates as you, with your full permissions.
+Notion's official API only supports Integration (bot) tokens — your agent can't do things **on behalf of you**. Vibe Notion solves this by extracting your `token_v2` from the Notion desktop app, so your agent operates as you, with your full permissions.
 
-Need official API access instead? `agent-notionbot` is included and fully supports Integration tokens via `NOTION_TOKEN`.
+Need official API access instead? `vibe-notionbot` is included and fully supports Integration tokens via `NOTION_TOKEN`.
 
-- 👤 **Act as you** — `agent-notion` extracts `token_v2` from the Notion desktop app to operate with your own permissions
-- 🤖 **Bot support too** — `agent-notionbot` supports official Integration tokens via `NOTION_TOKEN`
+- 👤 **Act as you** — `vibe-notion` extracts `token_v2` from the Notion desktop app to operate with your own permissions
+- 🤖 **Bot support too** — `vibe-notionbot` supports official Integration tokens via `NOTION_TOKEN`
 - 📦 **Full API coverage** — Pages, databases, blocks, users, search, comments, and workspaces
 - 🧾 **Agent friendly** — JSON output by default, perfect for LLM tool use
 - 👁 **Human friendly too** — Add `--pretty` for readable output
@@ -21,24 +21,24 @@ Need official API access instead? `agent-notionbot` is included and fully suppor
 ## 📦 Installation
 
 ```bash
-npm install -g agent-notion
+npm install -g vibe-notion
 ```
 
 Or use your favorite package manager.
 
-This installs both the `agent-notion` and `agent-notionbot` CLI tools.
+This installs both the `vibe-notion` and `vibe-notionbot` CLI tools.
 
 ## 🧩 Agent Skills
 
-Agent Notion includes [Agent Skills](https://agentskills.io/) that teach your AI agent how to use the CLI effectively. Two skills are available:
+Vibe Notion includes [Agent Skills](https://agentskills.io/) that teach your AI agent how to use the CLI effectively. Two skills are available:
 
-- **`agent-notion`** — For the unofficial private API (`token_v2`)
-- **`agent-notionbot`** — For the official Integration API (`NOTION_TOKEN`)
+- **`vibe-notion`** — For the unofficial private API (`token_v2`)
+- **`vibe-notionbot`** — For the official Integration API (`NOTION_TOKEN`)
 
 ### Skills CLI
 
 ```bash
-npx skills add devxoul/agent-notion
+npx skills add devxoul/vibe-notion
 ```
 
 See [skills.sh](https://skills.sh/) for more details.
@@ -46,54 +46,54 @@ See [skills.sh](https://skills.sh/) for more details.
 ### Claude Code
 
 ```bash
-claude plugin marketplace add devxoul/agent-notion
-claude plugin install agent-notion
+claude plugin marketplace add devxoul/vibe-notion
+claude plugin install vibe-notion
 ```
 
 Or within Claude Code:
 
 ```
-/plugin marketplace add devxoul/agent-notion
-/plugin install agent-notion
+/plugin marketplace add devxoul/vibe-notion
+/plugin install vibe-notion
 ```
 
 ## 🚀 Quick Start
 
-### `agent-notion` (Private API — act as yourself)
+### `vibe-notion` (Private API — act as yourself)
 
 ```bash
 # 1. Extract token_v2 from Notion desktop app
-agent-notion auth extract
+vibe-notion auth extract
 
 # 2. List your workspaces
-agent-notion workspace list --pretty
+vibe-notion workspace list --pretty
 
 # 3. Search for something
-agent-notion search "Roadmap" --workspace-id <workspace-id> --pretty
+vibe-notion search "Roadmap" --workspace-id <workspace-id> --pretty
 
 # 4. Get page details
-agent-notion page get <page-id> --workspace-id <workspace-id> --pretty
+vibe-notion page get <page-id> --workspace-id <workspace-id> --pretty
 ```
 
-### `agent-notionbot` (Official API — act as a bot)
+### `vibe-notionbot` (Official API — act as a bot)
 
 ```bash
 # 1. Set your Notion Integration Token
 export NOTION_TOKEN=secret_xxx
 
 # 2. Check auth status
-agent-notionbot auth status --pretty
+vibe-notionbot auth status --pretty
 
 # 3. Search for something
-agent-notionbot search "Roadmap" --filter page --pretty
+vibe-notionbot search "Roadmap" --filter page --pretty
 
 # 4. Get page details
-agent-notionbot page get <page-id> --pretty
+vibe-notionbot page get <page-id> --pretty
 ```
 
 ## 🛠 Command Overview
 
-### `agent-notion` (Private API)
+### `vibe-notion` (Private API)
 
 | Command | Description |
 |---------|-------------|
@@ -106,9 +106,9 @@ agent-notionbot page get <page-id> --pretty
 | `search` | Workspace search |
 | `comment` | List, create, and get comments |
 
-> All commands that operate within a workspace require `--workspace-id`. Use `agent-notion workspace list` to find yours.
+> All commands that operate within a workspace require `--workspace-id`. Use `vibe-notion workspace list` to find yours.
 
-### `agent-notionbot` (Official API)
+### `vibe-notionbot` (Official API)
 
 | Command | Description |
 |---------|-------------|

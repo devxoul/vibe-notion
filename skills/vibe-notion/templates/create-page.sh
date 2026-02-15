@@ -12,7 +12,7 @@ TITLE=$2
 echo "Creating page: $TITLE"
 # Create page and extract ID
 # Note: Requires 'jq' to be installed for ID extraction
-RESPONSE=$(agent-notion page create --parent "$PARENT_ID" --title "$TITLE")
+RESPONSE=$(vibe-notion page create --parent "$PARENT_ID" --title "$TITLE")
 PAGE_ID=$(echo $RESPONSE | jq -r '.id')
 
 if [ "$PAGE_ID" == "null" ] || [ -z "$PAGE_ID" ]; then
@@ -25,7 +25,7 @@ echo "Page created with ID: $PAGE_ID"
 
 # Append content
 echo "Appending content blocks..."
-agent-notion block append "$PAGE_ID" --content '[
+vibe-notion block append "$PAGE_ID" --content '[
   {
     "type": "heading_2",
     "heading_2": {
@@ -35,7 +35,7 @@ agent-notion block append "$PAGE_ID" --content '[
   {
     "type": "paragraph",
     "paragraph": {
-      "rich_text": [{ "type": "text", "text": { "content": "This page was created automatically using the Agent Notion CLI." } }]
+      "rich_text": [{ "type": "text", "text": { "content": "This page was created automatically using the Vibe Notion CLI." } }]
     }
   }
 ]' --pretty

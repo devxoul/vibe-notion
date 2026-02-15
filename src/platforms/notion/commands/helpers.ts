@@ -19,7 +19,7 @@ export async function getCredentialsOrExit(): Promise<NotionCredentials> {
   const manager = new CredentialManager()
   const creds = await manager.getCredentials()
   if (!creds) {
-    console.error(JSON.stringify({ error: 'Not authenticated. Run: agent-notion auth extract' }))
+    console.error(JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }))
     process.exit(1)
   }
   return creds

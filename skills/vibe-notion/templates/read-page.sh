@@ -9,7 +9,7 @@ fi
 PAGE_ID=$1
 
 echo "--- Page Metadata ---"
-agent-notion page get "$PAGE_ID" --pretty
+vibe-notion page get "$PAGE_ID" --pretty
 
 echo -e "\n--- Page Content (Direct Children) ---"
-agent-notion block children "$PAGE_ID" --pretty
+vibe-notion block children "$PAGE_ID" --pretty

@@ -1,35 +1,35 @@
 ---
-name: agent-notion
+name: vibe-notion
 description: Interact with Notion using the unofficial private API - pages, databases, blocks, search, users, comments
-allowed-tools: Bash(agent-notion:*)
+allowed-tools: Bash(vibe-notion:*)
 ---
 
-# Agent Notion
+# Vibe Notion
 
 A TypeScript CLI tool that enables AI agents and humans to interact with Notion workspaces through the unofficial private API. Supports full CRUD operations on pages, databases, blocks, search, and user management.
 
-> **Note**: This skill uses Notion's internal/private API (`/api/v3/`), which is separate from the official public API. For official API access, use `agent-notionbot`.
+> **Note**: This skill uses Notion's internal/private API (`/api/v3/`), which is separate from the official public API. For official API access, use `vibe-notionbot`.
 
 ## Quick Start
 
 ```bash
 # 1. Extract token_v2 from Notion desktop app
-agent-notion auth extract
+vibe-notion auth extract
 
 # 2. Find your workspace ID
-agent-notion workspace list --pretty
+vibe-notion workspace list --pretty
 
 # 3. Search for a page
-agent-notion search "Roadmap" --workspace-id <workspace-id> --pretty
+vibe-notion search "Roadmap" --workspace-id <workspace-id> --pretty
 
 # 4. Get page content
-agent-notion page get <page-id> --workspace-id <workspace-id> --pretty
+vibe-notion page get <page-id> --workspace-id <workspace-id> --pretty
 
 # 5. Query a database
-agent-notion database query <collection-id> --workspace-id <workspace-id> --pretty
+vibe-notion database query <collection-id> --workspace-id <workspace-id> --pretty
 ```
 
-> **Important**: `--workspace-id` is required for ALL commands that operate within a specific workspace. Use `agent-notion workspace list` to find your workspace ID.
+> **Important**: `--workspace-id` is required for ALL commands that operate within a specific workspace. Use `vibe-notion workspace list` to find your workspace ID.
 
 ## Authentication
 
@@ -39,33 +39,33 @@ Extract `token_v2` from the Notion desktop app automatically. No API keys or OAu
 
 ```bash
 # Extract token_v2 from Notion desktop app
-agent-notion auth extract
+vibe-notion auth extract
 
 # Check auth status (shows extracted token_v2)
-agent-notion auth status
+vibe-notion auth status
 
 # Remove stored token_v2
-agent-notion auth logout
+vibe-notion auth logout
 ```
 
 On macOS, your system may prompt for Keychain access — this is normal and required to decrypt the cookie.
 
-The extracted `token_v2` is stored at `~/.config/agent-notion/credentials.json` with `0600` permissions.
+The extracted `token_v2` is stored at `~/.config/vibe-notion/credentials.json` with `0600` permissions.
 
 ## Memory
 
-The agent maintains a `~/.config/agent-notion/MEMORY.md` file as persistent memory across sessions. This is agent-managed — the CLI does not read or write this file. Use the `Read` and `Write` tools to manage your memory file.
+The agent maintains a `~/.config/vibe-notion/MEMORY.md` file as persistent memory across sessions. This is agent-managed — the CLI does not read or write this file. Use the `Read` and `Write` tools to manage your memory file.
 
 ### Reading Memory
 
-At the **start of every task**, read `~/.config/agent-notion/MEMORY.md` using the `Read` tool to load any previously discovered workspace IDs, page IDs, database IDs, and user preferences.
+At the **start of every task**, read `~/.config/vibe-notion/MEMORY.md` using the `Read` tool to load any previously discovered workspace IDs, page IDs, database IDs, and user preferences.
 
 - If the file doesn't exist yet, that's fine — proceed without it and create it when you first have useful information to store.
 - If the file can't be read (permissions, missing directory), proceed without memory — don't error out.
 
 ### Writing Memory
 
-After discovering useful information, update `~/.config/agent-notion/MEMORY.md` using the `Write` tool. Write triggers include:
+After discovering useful information, update `~/.config/vibe-notion/MEMORY.md` using the `Write` tool. Write triggers include:
 
 - After discovering workspace IDs (from `workspace list`)
 - After discovering useful page IDs, database IDs, collection IDs (from `search`, `page list`, `page get`, `database list`, etc.)
@@ -97,7 +97,7 @@ If a memorized ID returns an error (page not found, access denied), remove it fr
 Here's a concrete example of how to structure your `MEMORY.md`:
 
 ```markdown
-# Agent Notion Memory
+# Vibe Notion Memory
 
 ## Workspaces
 
@@ -131,106 +131,106 @@ Here's a concrete example of how to structure your `MEMORY.md`:
 ### Auth Commands
 
 ```bash
-agent-notion auth extract    # Extract token_v2 from Notion desktop app
-agent-notion auth status     # Check authentication status
-agent-notion auth logout     # Remove stored token_v2
+vibe-notion auth extract    # Extract token_v2 from Notion desktop app
+vibe-notion auth status     # Check authentication status
+vibe-notion auth logout     # Remove stored token_v2
 ```
 
 ### Page Commands
 
 ```bash
 # List pages in a space (top-level only)
-agent-notion page list --workspace-id <workspace_id> --pretty
-agent-notion page list --workspace-id <workspace_id> --depth 2 --pretty
+vibe-notion page list --workspace-id <workspace_id> --pretty
+vibe-notion page list --workspace-id <workspace_id> --depth 2 --pretty
 
 # Get a page and all its content blocks
-agent-notion page get <page_id> --workspace-id <workspace_id> --pretty
-agent-notion page get <page_id> --workspace-id <workspace_id> --limit 50
-agent-notion page get <page_id> --workspace-id <workspace_id> --backlinks --pretty
+vibe-notion page get <page_id> --workspace-id <workspace_id> --pretty
+vibe-notion page get <page_id> --workspace-id <workspace_id> --limit 50
+vibe-notion page get <page_id> --workspace-id <workspace_id> --backlinks --pretty
 
 # Create a new page under a parent
-agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Page" --pretty
+vibe-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Page" --pretty
 
 # Create a page with markdown content
-agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Doc" --markdown '# Hello\n\nThis is **bold** text.'
+vibe-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Doc" --markdown '# Hello\n\nThis is **bold** text.'
 
 # Create a page with markdown from a file
-agent-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Doc" --markdown-file ./content.md
+vibe-notion page create --workspace-id <workspace_id> --parent <parent_id> --title "My Doc" --markdown-file ./content.md
 
 # Replace all content on a page with new markdown
-agent-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown '# New Content'
-agent-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown-file ./updated.md
+vibe-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown '# New Content'
+vibe-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown-file ./updated.md
 
 # Update page title or icon
-agent-notion page update <page_id> --workspace-id <workspace_id> --title "New Title" --pretty
-agent-notion page update <page_id> --workspace-id <workspace_id> --icon "🚀" --pretty
+vibe-notion page update <page_id> --workspace-id <workspace_id> --title "New Title" --pretty
+vibe-notion page update <page_id> --workspace-id <workspace_id> --icon "🚀" --pretty
 
 # Archive a page
-agent-notion page archive <page_id> --workspace-id <workspace_id> --pretty
+vibe-notion page archive <page_id> --workspace-id <workspace_id> --pretty
 ```
 
 ### Database Commands
 
 ```bash
 # Get database schema
-agent-notion database get <collection_id> --workspace-id <workspace_id> --pretty
+vibe-notion database get <collection_id> --workspace-id <workspace_id> --pretty
 
 # Query a database (auto-resolves default view)
-agent-notion database query <collection_id> --workspace-id <workspace_id> --pretty
-agent-notion database query <collection_id> --workspace-id <workspace_id> --limit 10 --pretty
-agent-notion database query <collection_id> --workspace-id <workspace_id> --view-id <view_id> --pretty
-agent-notion database query <collection_id> --workspace-id <workspace_id> --search-query "keyword" --pretty
-agent-notion database query <collection_id> --workspace-id <workspace_id> --timezone "America/New_York" --pretty
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --pretty
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --limit 10 --pretty
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --view-id <view_id> --pretty
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --search-query "keyword" --pretty
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --timezone "America/New_York" --pretty
 
 # List all databases in workspace
-agent-notion database list --workspace-id <workspace_id> --pretty
+vibe-notion database list --workspace-id <workspace_id> --pretty
 
 # Create a database
-agent-notion database create --workspace-id <workspace_id> --parent <page_id> --title "Tasks" --pretty
-agent-notion database create --workspace-id <workspace_id> --parent <page_id> --title "Tasks" --properties '{"status":{"name":"Status","type":"select"}}' --pretty
+vibe-notion database create --workspace-id <workspace_id> --parent <page_id> --title "Tasks" --pretty
+vibe-notion database create --workspace-id <workspace_id> --parent <page_id> --title "Tasks" --properties '{"status":{"name":"Status","type":"select"}}' --pretty
 
 # Update database title or schema
-agent-notion database update <collection_id> --workspace-id <workspace_id> --title "New Name" --pretty
+vibe-notion database update <collection_id> --workspace-id <workspace_id> --title "New Name" --pretty
 
 # Add a row to a database
-agent-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --pretty
-agent-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --properties '{"Status":"In Progress","Due":{"start":"2025-03-01"}}' --pretty
+vibe-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --pretty
+vibe-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --properties '{"Status":"In Progress","Due":{"start":"2025-03-01"}}' --pretty
 
 # Get view configuration and property visibility
-agent-notion database view-get <view_id> --workspace-id <workspace_id> --pretty
+vibe-notion database view-get <view_id> --workspace-id <workspace_id> --pretty
 
 # Show or hide properties on a view (comma-separated names)
-agent-notion database view-update <view_id> --workspace-id <workspace_id> --show "ID,Due" --pretty
-agent-notion database view-update <view_id> --workspace-id <workspace_id> --hide "Assignee" --pretty
-agent-notion database view-update <view_id> --workspace-id <workspace_id> --show "Status" --hide "Due" --pretty
+vibe-notion database view-update <view_id> --workspace-id <workspace_id> --show "ID,Due" --pretty
+vibe-notion database view-update <view_id> --workspace-id <workspace_id> --hide "Assignee" --pretty
+vibe-notion database view-update <view_id> --workspace-id <workspace_id> --show "Status" --hide "Due" --pretty
 ```
 
 ### Block Commands
 
 ```bash
 # Get a specific block
-agent-notion block get <block_id> --workspace-id <workspace_id> --pretty
-agent-notion block get <block_id> --workspace-id <workspace_id> --backlinks --pretty
+vibe-notion block get <block_id> --workspace-id <workspace_id> --pretty
+vibe-notion block get <block_id> --workspace-id <workspace_id> --backlinks --pretty
 
 # List child blocks
-agent-notion block children <block_id> --workspace-id <workspace_id> --pretty
-agent-notion block children <block_id> --workspace-id <workspace_id> --limit 50 --pretty
-agent-notion block children <block_id> --workspace-id <workspace_id> --start-cursor '<next_cursor_json>' --pretty
+vibe-notion block children <block_id> --workspace-id <workspace_id> --pretty
+vibe-notion block children <block_id> --workspace-id <workspace_id> --limit 50 --pretty
+vibe-notion block children <block_id> --workspace-id <workspace_id> --start-cursor '<next_cursor_json>' --pretty
 
 # Append child blocks
-agent-notion block append <parent_id> --workspace-id <workspace_id> --content '[{"type":"text","properties":{"title":[["Hello world"]]}}]' --pretty
+vibe-notion block append <parent_id> --workspace-id <workspace_id> --content '[{"type":"text","properties":{"title":[["Hello world"]]}}]' --pretty
 
 # Append markdown content as blocks
-agent-notion block append <parent_id> --workspace-id <workspace_id> --markdown '# Hello\n\nThis is **bold** text.'
+vibe-notion block append <parent_id> --workspace-id <workspace_id> --markdown '# Hello\n\nThis is **bold** text.'
 
 # Append markdown from a file
-agent-notion block append <parent_id> --workspace-id <workspace_id> --markdown-file ./content.md
+vibe-notion block append <parent_id> --workspace-id <workspace_id> --markdown-file ./content.md
 
 # Update a block
-agent-notion block update <block_id> --workspace-id <workspace_id> --content '{"properties":{"title":[["Updated text"]]}}' --pretty
+vibe-notion block update <block_id> --workspace-id <workspace_id> --content '{"properties":{"title":[["Updated text"]]}}' --pretty
 
 # Delete a block
-agent-notion block delete <block_id> --workspace-id <workspace_id> --pretty
+vibe-notion block delete <block_id> --workspace-id <workspace_id> --pretty
 ```
 
 ### Block Types Reference
@@ -303,35 +303,35 @@ Multiple segments: `[["plain "], ["bold", [["b"]]], [" more plain"]]`
 
 ```bash
 # List comments on a page
-agent-notion comment list --page <page_id> --workspace-id <workspace_id> --pretty
+vibe-notion comment list --page <page_id> --workspace-id <workspace_id> --pretty
 
 # Create a comment on a page (starts a new discussion)
-agent-notion comment create "This is a comment" --page <page_id> --workspace-id <workspace_id> --pretty
+vibe-notion comment create "This is a comment" --page <page_id> --workspace-id <workspace_id> --pretty
 
 # Reply to an existing discussion thread
-agent-notion comment create "Replying to thread" --discussion <discussion_id> --workspace-id <workspace_id> --pretty
+vibe-notion comment create "Replying to thread" --discussion <discussion_id> --workspace-id <workspace_id> --pretty
 
 # Get a specific comment by ID
-agent-notion comment get <comment_id> --workspace-id <workspace_id> --pretty
+vibe-notion comment get <comment_id> --workspace-id <workspace_id> --pretty
 ```
 
 ### Search Command
 
 ```bash
 # Search across workspace (--workspace-id is required)
-agent-notion search "query" --workspace-id <workspace_id> --pretty
-agent-notion search "query" --workspace-id <workspace_id> --limit 10 --pretty
-agent-notion search "query" --workspace-id <workspace_id> --start-cursor <offset> --pretty
+vibe-notion search "query" --workspace-id <workspace_id> --pretty
+vibe-notion search "query" --workspace-id <workspace_id> --limit 10 --pretty
+vibe-notion search "query" --workspace-id <workspace_id> --start-cursor <offset> --pretty
 ```
 
 ### User Commands
 
 ```bash
 # Get current user info
-agent-notion user me --pretty
+vibe-notion user me --pretty
 
 # Get a specific user
-agent-notion user get <user_id> --workspace-id <workspace_id> --pretty
+vibe-notion user get <user_id> --workspace-id <workspace_id> --pretty
 ```
 
 ## Output Format
@@ -342,7 +342,7 @@ All commands output JSON by default for AI consumption:
 
 ```bash
 # Search results
-agent-notion search "Roadmap" --workspace-id <workspace_id>
+vibe-notion search "Roadmap" --workspace-id <workspace_id>
 ```
 ```json
 {
@@ -361,7 +361,7 @@ agent-notion search "Roadmap" --workspace-id <workspace_id>
 
 ```bash
 # Database query — properties use human-readable field names from the collection schema
-agent-notion database query <collection_id> --workspace-id <workspace_id>
+vibe-notion database query <collection_id> --workspace-id <workspace_id>
 ```
 ```json
 {
@@ -382,7 +382,7 @@ agent-notion database query <collection_id> --workspace-id <workspace_id>
 
 ```bash
 # Page get — returns page metadata with content blocks
-agent-notion page get <page_id> --workspace-id <workspace_id>
+vibe-notion page get <page_id> --workspace-id <workspace_id>
 ```
 ```json
 {
@@ -397,8 +397,8 @@ agent-notion page get <page_id> --workspace-id <workspace_id>
 
 ```bash
 # With --backlinks: includes pages that link to this page/block
-agent-notion page get <page_id> --workspace-id <workspace_id> --backlinks
-agent-notion block get <block_id> --workspace-id <workspace_id> --backlinks
+vibe-notion page get <page_id> --workspace-id <workspace_id> --backlinks
+vibe-notion block get <block_id> --workspace-id <workspace_id> --backlinks
 ```
 ```json
 {
@@ -413,7 +413,7 @@ agent-notion block get <block_id> --workspace-id <workspace_id> --backlinks
 
 ```bash
 # Block get — collection_view blocks include collection_id and view_ids
-agent-notion block get <block_id> --workspace-id <workspace_id>
+vibe-notion block get <block_id> --workspace-id <workspace_id>
 ```
 ```json
 {
@@ -431,7 +431,7 @@ agent-notion block get <block_id> --workspace-id <workspace_id>
 Use `--pretty` flag for formatted output on any command:
 
 ```bash
-agent-notion search "Roadmap" --workspace-id <workspace_id> --pretty
+vibe-notion search "Roadmap" --workspace-id <workspace_id> --pretty
 ```
 
 ## When to Use `--backlinks`
@@ -446,14 +446,14 @@ Backlinks reveal which pages/databases **link to** a given page. This is critica
 **Example — finding who uses a specific plan:**
 ```bash
 # BAD: 15 API calls — search, open empty pages, trace parents, find database, query
-agent-notion search "Enterprise Plan" ...
-agent-notion page get <plan-page-id> ...  # empty
-agent-notion block get <plan-page-id> ...  # find parent
+vibe-notion search "Enterprise Plan" ...
+vibe-notion page get <plan-page-id> ...  # empty
+vibe-notion block get <plan-page-id> ...  # find parent
 # ... many more calls to discover the database
 
 # GOOD: 2-3 API calls — search, then backlinks on the target
-agent-notion search "Enterprise Plan" ...
-agent-notion page get <plan-page-id> --backlinks --pretty
+vibe-notion search "Enterprise Plan" ...
+vibe-notion page get <plan-page-id> --backlinks --pretty
 # → backlinks immediately show all people/rows linked to this plan
 ```
 

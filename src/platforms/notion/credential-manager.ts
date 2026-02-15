@@ -18,7 +18,7 @@ export class CredentialManager {
   private credentialsPath: string
 
   constructor(configDir?: string) {
-    this.configDir = configDir ?? join(homedir(), '.config', 'agent-notion')
+    this.configDir = configDir ?? join(homedir(), '.config', 'vibe-notion')
     this.credentialsPath = join(this.configDir, 'credentials.json')
   }
 

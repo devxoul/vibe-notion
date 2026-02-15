@@ -1,6 +1,6 @@
-# Contributing to Agent Notion
+# Contributing to Vibe Notion
 
-Thank you for your interest in contributing to Agent Notion!
+Thank you for your interest in contributing to Vibe Notion!
 
 ## Development Setup
 
@@ -20,7 +20,7 @@ To test the CLI locally, link it:
 bun link
 ```
 
-Now you can run `agent-notion` directly from your terminal.
+Now you can run `vibe-notion` directly from your terminal.
 
 ### 3. Run Tests
 
@@ -59,14 +59,14 @@ The compiled files will be in the `dist/` directory. The `postbuild` script will
 ## Project Structure
 
 - `src/` — Source code
-  - `platforms/notion/` — Unofficial private API CLI (`agent-notion`)
+  - `platforms/notion/` — Unofficial private API CLI (`vibe-notion`)
     - `cli.ts` — CLI entry point
     - `client.ts` — Private API client
     - `commands/` — Command implementations
     - `credential-manager.ts` — Token storage
     - `token-extractor.ts` — Desktop app token extraction
     - `formatters.ts` — Output formatting
-  - `platforms/notionbot/` — Official API CLI (`agent-notionbot`)
+  - `platforms/notionbot/` — Official API CLI (`vibe-notionbot`)
     - `cli.ts` — CLI entry point
     - `client.ts` — Official API client (`@notionhq/client`)
     - `commands/` — Command implementations
@@ -75,8 +75,8 @@ The compiled files will be in the `dist/` directory. The `postbuild` script will
     - `markdown/` — Markdown parsing utilities
     - `utils/` — Shared utility functions
 - `skills/` — Agent skill definitions
-  - `agent-notion/` — Skill for the private API CLI
-  - `agent-notionbot/` — Skill for the official API CLI
+  - `vibe-notion/` — Skill for the private API CLI
+  - `vibe-notionbot/` — Skill for the official API CLI
 - `scripts/` — Build and development scripts
 - `.claude-plugin/` — Claude marketplace manifest files
 

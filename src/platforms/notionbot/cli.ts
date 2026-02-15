@@ -14,7 +14,7 @@ import {
 
 const program = new Command()
 
-program.name('agent-notionbot').description('Notion official API CLI for AI agents').version(pkg.version)
+program.name('vibe-notionbot').description('Notion official API CLI for AI agents').version(pkg.version)
 
 program.addCommand(authCommand)
 program.addCommand(blockCommand)

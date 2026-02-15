@@ -17,7 +17,7 @@ import {
 const program = new Command()
 
 program
-  .name('agent-notion')
+  .name('vibe-notion')
   .description('Notion unofficial API CLI for AI agents')
   .version(pkg.version)
   .option('--user-id <id>', 'Active user ID for multi-account support')

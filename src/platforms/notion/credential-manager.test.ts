@@ -9,7 +9,7 @@ describe('CredentialManager', () => {
   let manager: CredentialManager
 
   beforeEach(() => {
-    configDir = mkdtempSync(join(tmpdir(), 'agent-notion-credentials-'))
+    configDir = mkdtempSync(join(tmpdir(), 'vibe-notion-credentials-'))
     manager = new CredentialManager(configDir)
   })
 

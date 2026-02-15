@@ -54,7 +54,7 @@ export async function validateNotionEnvironment() {
   if (result.exitCode !== 0) {
     throw new Error(
       'Notion auth status failed. ' +
-      'Please run `agent-notion auth extract` first to store credentials. ' +
+      'Please run `vibe-notion auth extract` first to store credentials. ' +
       `Error: ${result.stderr || result.stdout}`
     )
   }
@@ -63,7 +63,7 @@ export async function validateNotionEnvironment() {
   if (!data?.stored_token_v2) {
     throw new Error(
       'No stored credentials found. ' +
-      'Please run `agent-notion auth extract` to extract token_v2 from the Notion desktop app.'
+      'Please run `vibe-notion auth extract` to extract token_v2 from the Notion desktop app.'
     )
   }
 }

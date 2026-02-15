@@ -1,4 +1,4 @@
-# Agent Notion - Claude Code Plugin
+# Vibe Notion - Claude Code Plugin
 
 Notion workspace interaction skill for AI agents and Claude Code. Manage pages, databases, blocks, search, and comments through a simple CLI interface.
 
@@ -6,17 +6,17 @@ Notion workspace interaction skill for AI agents and Claude Code. Manage pages, 
 
 ```bash
 # Add the marketplace
-claude plugin marketplace add devxoul/agent-notion
+claude plugin marketplace add devxoul/vibe-notion
 
 # Install the plugin
-claude plugin install agent-notion
+claude plugin install vibe-notion
 ```
 
 Or within Claude Code:
 
 ```
-/plugin marketplace add devxoul/agent-notion
-/plugin install agent-notion
+/plugin marketplace add devxoul/vibe-notion
+/plugin install vibe-notion
 ```
 
 ## What it does
@@ -56,16 +56,16 @@ Supports all major Notion API resource groups:
 
 ```bash
 # 1. Check authentication status
-agent-notion auth status
+vibe-notion auth status
 
 # 2. Search for a page
-agent-notion search "Project Roadmap" --filter page
+vibe-notion search "Project Roadmap" --filter page
 
 # 3. Get page content (blocks)
-agent-notion block children <page-id>
+vibe-notion block children <page-id>
 
 # 4. Create a new page in a database
-agent-notion page create --parent <database-id> --title "New Task" --database
+vibe-notion page create --parent <database-id> --title "New Task" --database
 ```
 
 ## Example Usage
@@ -74,30 +74,30 @@ agent-notion page create --parent <database-id> --title "New Task" --database
 
 ```bash
 # List all databases
-agent-notion database list
+vibe-notion database list
 
 # Query a database with a filter
-agent-notion database query <database-id> --filter '{"property": "Status", "select": {"equals": "In Progress"}}'
+vibe-notion database query <database-id> --filter '{"property": "Status", "select": {"equals": "In Progress"}}'
 ```
 
 ### Blocks
 
 ```bash
 # Append a paragraph to a page
-agent-notion block append <page-id> --content '[{"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "Hello Notion!"}}]}}]'
+vibe-notion block append <page-id> --content '[{"type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": "Hello Notion!"}}]}}]'
 ```
 
 ### Comments
 
 ```bash
 # List comments on a page
-agent-notion comment list --page <page-id>
+vibe-notion comment list --page <page-id>
 
 # Add a comment
-agent-notion comment create --page <page-id> "This looks great!"
+vibe-notion comment create --page <page-id> "This looks great!"
 ```
 
 ## More Information
 
-- [GitHub Repository](https://github.com/devxoul/agent-notion)
-- [Skill Documentation](https://github.com/devxoul/agent-notion/blob/main/skills/agent-notion/SKILL.md)
+- [GitHub Repository](https://github.com/devxoul/vibe-notion)
+- [Skill Documentation](https://github.com/devxoul/vibe-notion/blob/main/skills/vibe-notion/SKILL.md)

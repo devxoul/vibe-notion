@@ -24,7 +24,7 @@ function generateId(): string {
 async function getCredentialsOrExit() {
   const creds = await _mockGetCredentials()
   if (!creds) {
-    console.error(JSON.stringify({ error: 'Not authenticated. Run: agent-notion auth extract' }))
+    console.error(JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }))
     process.exit(1)
   }
   return creds
@@ -170,7 +170,7 @@ describe('getCredentialsOrExit', () => {
     try {
       await getCredentialsOrExit().catch(() => {})
       expect(consoleErrorMock).toHaveBeenCalledWith(
-        JSON.stringify({ error: 'Not authenticated. Run: agent-notion auth extract' }),
+        JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }),
       )
     } finally {
       console.error = originalError

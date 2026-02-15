@@ -1,13 +1,13 @@
 {
-  "name": "agent-notion",
+  "name": "vibe-notion",
   "version": "0.1.0",
   "description": "Notion API CLI for AI agents",
   "type": "module",
   "module": "dist/cli.js",
   "main": "dist/cli.js",
   "bin": {
-    "agent-notionbot": "./src/platforms/notionbot/cli.ts",
-    "agent-notion": "./src/platforms/notion/cli.ts"
+    "vibe-notionbot": "./src/platforms/notionbot/cli.ts",
+    "vibe-notion": "./src/platforms/notion/cli.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -35,7 +35,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devxoul/agent-notion.git"
+    "url": "git+https://github.com/devxoul/vibe-notion.git"
   },
   "license": "MIT",
   "devDependencies": {
