@@ -20,6 +20,7 @@
   "homepage": "https://github.com/devxoul/vibe-notion",
   "repository": "https://github.com/devxoul/vibe-notion",
   "skills": [
-    "./skills/vibe-notion"
+    "./skills/vibe-notion",
+    "./skills/vibe-notionbot"
   ]
 }

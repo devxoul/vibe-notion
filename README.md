@@ -45,16 +45,10 @@ See [skills.sh](https://skills.sh/) for more details.
 
 ### Claude Code
 
+Install the skill via the Skills CLI, then it's automatically available in Claude Code:
+
 ```bash
-claude plugin marketplace add devxoul/vibe-notion
-claude plugin install vibe-notion
-```
-
-Or within Claude Code:
-
-```
-/plugin marketplace add devxoul/vibe-notion
-/plugin install vibe-notion
+npx skills add devxoul/vibe-notion
 ```
 
 ## 🚀 Quick Start

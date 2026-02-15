@@ -19,14 +19,23 @@ vibe-notion block children <block_id> --workspace-id <workspace_id>
 
 ## 2. Querying a Database and Processing Results
 
-Querying a database returns a list of page objects. You can filter and sort these results.
+Querying a database returns a list of page objects. You can filter, sort, and search results.
 
 ```bash
-# Find all "Active" projects sorted by "Deadline"
-vibe-notion database query <database_id> --workspace-id <workspace_id> \
-  --filter '{"property": "Status", "status": {"equals": "Active"}}' \
-  --sort '[{"property": "Deadline", "direction": "ascending"}]'
+# Query a database with a search keyword
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --search-query "keyword" --pretty
+
+# Query with a limit
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --limit 10 --pretty
+
+# Query a specific view
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --view-id <view_id> --pretty
+
+# Query with timezone
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --timezone "America/New_York" --pretty
 ```
+
+> **Note**: The `--filter` and `--sort` options use property IDs from the database schema (retrieved via `database get`), not property names.
 
 ## 3. Creating a Page with Initial Content
 
@@ -60,15 +69,22 @@ vibe-notion page create --workspace-id <workspace_id> --parent <parent_id> --tit
 vibe-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown-file ./updated.md
 ```
 
-## 5. Updating Multiple Properties
+## 5. Updating a Page
 
-You can update multiple properties at once using the `--set` flag.
+You can update a page's title, icon, or replace its entire content.
 
 ```bash
-vibe-notion page update <page_id> --workspace-id <workspace_id> \
-  --set "Status=Done" \
-  --set "Complete=true" \
-  --set "Assignee=user_id"
+# Update title
+vibe-notion page update <page_id> --workspace-id <workspace_id> --title "New Title" --pretty
+
+# Update icon
+vibe-notion page update <page_id> --workspace-id <workspace_id> --icon "🚀" --pretty
+
+# Replace all content with new markdown
+vibe-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown '# New Content'
+
+# Replace all content from a markdown file
+vibe-notion page update <page_id> --workspace-id <workspace_id> --replace-content --markdown-file ./updated.md
 ```
 
 ## 6. Searching for Specific Content
@@ -76,11 +92,17 @@ vibe-notion page update <page_id> --workspace-id <workspace_id> \
 Search is the best way to find objects when you don't have their IDs.
 
 ```bash
-# Search for databases only
-vibe-notion search "Inventory" --workspace-id <workspace_id> --filter database
+# Basic search
+vibe-notion search "Inventory" --workspace-id <workspace_id> --pretty
 
-# Search for pages modified recently
-vibe-notion search "Meeting Notes" --workspace-id <workspace_id> --filter page --sort desc
+# Search with a result limit
+vibe-notion search "Meeting Notes" --workspace-id <workspace_id> --limit 10 --pretty
+
+# Search sorted by last edited time
+vibe-notion search "Meeting Notes" --workspace-id <workspace_id> --sort lastEdited --pretty
+
+# Paginate through results using next_cursor from previous response
+vibe-notion search "Notes" --workspace-id <workspace_id> --start-cursor 20 --pretty
 ```
 
 ## 7. Handling Pagination
@@ -88,9 +110,12 @@ vibe-notion search "Meeting Notes" --workspace-id <workspace_id> --filter page -
 Many list and query commands support pagination.
 
 ```bash
-# Get the first 10 results
-vibe-notion database query <database_id> --workspace-id <workspace_id> --page-size 10
+# Get the first 10 database results
+vibe-notion database query <collection_id> --workspace-id <workspace_id> --limit 10
 
-# Get the next page using the start-cursor from the previous response
-vibe-notion database query <database_id> --workspace-id <workspace_id> --start-cursor "previous_next_cursor"
+# Block children use cursor-based pagination — pass next_cursor JSON from previous response
+vibe-notion block children <block_id> --workspace-id <workspace_id> --start-cursor '<next_cursor_json>'
+
+# Search uses offset-based pagination — pass next_cursor number from previous response
+vibe-notion search "query" --workspace-id <workspace_id> --start-cursor 20
 ```
