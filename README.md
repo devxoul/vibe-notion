@@ -35,7 +35,7 @@ Vibe Notion includes [Agent Skills](https://agentskills.io/) that teach your AI 
 - **`vibe-notion`** — For the unofficial private API (`token_v2`)
 - **`vibe-notionbot`** — For the official Integration API (`NOTION_TOKEN`)
 
-### Skills CLI
+### Skills CLI (OpenCode, Cline, etc.)
 
 ```bash
 npx skills add devxoul/vibe-notion
@@ -45,10 +45,28 @@ See [skills.sh](https://skills.sh/) for more details.
 
 ### Claude Code
 
-Install the skill via the Skills CLI, then it's automatically available in Claude Code:
-
 ```bash
-npx skills add devxoul/vibe-notion
+claude plugin marketplace add devxoul/vibe-notion
+claude plugin install vibe-notion
+```
+
+Or within Claude Code:
+
+```
+/plugin marketplace add devxoul/vibe-notion
+/plugin install vibe-notion
+```
+
+### OpenCode (via plugin)
+
+Add to your `opencode.jsonc`:
+
+```jsonc
+{
+  "plugins": [
+    "vibe-notion"
+  ]
+}
 ```
 
 ## 🚀 Quick Start
