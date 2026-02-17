@@ -1,6 +1,6 @@
 {
   "name": "vibe-notion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Notion API CLI for AI agents",
   "type": "module",
   "module": "dist/cli.js",
