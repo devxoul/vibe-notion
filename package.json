@@ -10,7 +10,7 @@
     "vibe-notion": "./src/platforms/notion/cli.ts"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias --resolve-full-paths",
     "postbuild": "bun scripts/postbuild.ts",
     "test": "bun test src/",
     "test:e2e": "bun test --config /dev/null e2e/",
@@ -43,6 +43,7 @@
     "@types/better-sqlite3": "latest",
     "@types/bun": "latest",
     "@types/node": "latest",
+    "tsc-alias": "^1.8.16",
     "typescript": "latest"
   }
 }
