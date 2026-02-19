@@ -277,6 +277,66 @@ describe('Notion E2E Tests', () => {
       await waitForRateLimit()
     }, 15000)
 
+    test('database add-row with select property registers option in schema', async () => {
+      const testId = generateTestId()
+      const databaseTitle = `e2e-select-db-${testId}`
+      const rowTitle = `e2e-select-row-${testId}`
+      const selectValue = `Select-${testId}`
+
+      const createResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        databaseTitle,
+        '--properties',
+        '{"status":{"name":"Status","type":"select"}}',
+      ])
+      expect(createResult.exitCode).toBe(0)
+
+      const created = parseJSON<{ id: string }>(createResult.stdout)
+      expect(created?.id).toBeTruthy()
+      const selectDbId = created!.id
+      testDatabaseIds.push(selectDbId)
+      await waitForRateLimit()
+
+      const addRowResult = await runNotionCLI([
+        'database',
+        'add-row',
+        '--workspace-id',
+        workspaceId,
+        selectDbId,
+        '--title',
+        rowTitle,
+        '--properties',
+        `{"Status":"${selectValue}"}`,
+      ])
+      expect(addRowResult.exitCode).toBe(0)
+      await waitForRateLimit()
+
+      const queryResult = await runNotionCLI(['database', 'query', '--workspace-id', workspaceId, selectDbId])
+      expect(queryResult.exitCode).toBe(0)
+
+      const data = parseJSON<{
+        results: Array<{
+          properties: Record<string, { type: string; value: unknown }>
+        }>
+      }>(queryResult.stdout)
+      expect(Array.isArray(data?.results)).toBe(true)
+
+      const matchedRow = data?.results.find((row) => {
+        const nameValue = row.properties.Name?.value
+        const statusValue = row.properties.Status?.value
+        return nameValue === rowTitle && statusValue === selectValue
+      })
+      expect(matchedRow).toBeDefined()
+
+      await waitForRateLimit()
+    }, 15000)
+
     test('database update updates the created database title', async () => {
       expect(createdDbId).toBeTruthy()
 
