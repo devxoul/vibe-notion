@@ -113,6 +113,26 @@ async function updateAction(
   }
 }
 
+async function deletePropertyAction(
+  rawDatabaseId: string,
+  options: PrettyOption & { property: string },
+): Promise<void> {
+  const databaseId = formatNotionId(rawDatabaseId)
+  try {
+    const client = getClient()
+    const result = await client.request({
+      path: `databases/${databaseId}`,
+      method: 'patch',
+      body: {
+        properties: { [options.property]: null },
+      },
+    })
+    console.log(formatOutput(formatDatabase(result as Record<string, unknown>), options.pretty))
+  } catch (error) {
+    handleError(error as Error)
+  }
+}
+
 async function listAction(options: PrettyOption & { pageSize?: string; startCursor?: string }): Promise<void> {
   try {
     const client = getClient()
@@ -171,6 +191,14 @@ export const databaseCommand = new Command('database')
       .option('--properties <json>', 'Properties schema as JSON string')
       .option('--pretty', 'Pretty print JSON output')
       .action(updateAction),
+  )
+  .addCommand(
+    new Command('delete-property')
+      .description('Delete a property from a database')
+      .argument('<database_id>', 'Database ID')
+      .requiredOption('--property <name>', 'Property name to delete')
+      .option('--pretty', 'Pretty print JSON output')
+      .action(deletePropertyAction),
   )
   .addCommand(
     new Command('list')

@@ -239,6 +239,36 @@ describe('NotionBot E2E Tests', () => {
       await waitForRateLimit()
     }, 15000)
 
+    test('database delete-property removes a property', async () => {
+      expect(createdDbId).toBeTruthy()
+
+      const properties = JSON.stringify({
+        E2EProp: { rich_text: {} },
+      })
+      const addResult = await runCLI([
+        'database', 'update', createdDbId,
+        '--properties', properties,
+      ])
+      expect(addResult.exitCode).toBe(0)
+
+      const added = parseJSON<{ id: string; properties: Record<string, string> }>(addResult.stdout)
+      expect(added?.properties?.E2EProp).toBe('rich_text')
+
+      await waitForRateLimit()
+
+      const result = await runCLI([
+        'database', 'delete-property', createdDbId,
+        '--property', 'E2EProp',
+      ])
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{ id: string; properties: Record<string, string> }>(result.stdout)
+      expect(data?.id).toBe(createdDbId)
+      expect(data?.properties?.E2EProp).toBeUndefined()
+
+      await waitForRateLimit()
+    }, 30000)
+
     test('database list returns databases', async () => {
       const result = await runCLI(['database', 'list', '--page-size', '5'])
       expect(result.exitCode).toBe(0)

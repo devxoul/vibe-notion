@@ -254,6 +254,50 @@ describe('database commands', () => {
     })
   })
 
+  describe('delete-property', () => {
+    test('deletes property by name via PATCH with null value', async () => {
+      // Given
+      mockRequest.mockResolvedValue({
+        id: 'db-123',
+        url: 'https://notion.so/db-123',
+        title: [{ plain_text: 'My Database' }],
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        properties: { Name: { id: 'title', type: 'title', title: {} } },
+      })
+
+      // When
+      await databaseCommand.parseAsync(['delete-property', 'db-123', '--property', 'Status'], { from: 'user' })
+
+      // Then
+      expect(mockRequest).toHaveBeenCalledWith({
+        path: 'databases/db-123',
+        method: 'patch',
+        body: {
+          properties: { Status: null },
+        },
+      })
+      const output = JSON.parse(consoleOutput[0])
+      expect(output.id).toBe('db-123')
+    })
+
+    test('handles error on delete failure', async () => {
+      // Given
+      mockRequest.mockRejectedValue(new Error('Property not found'))
+
+      // When
+      try {
+        await databaseCommand.parseAsync(['delete-property', 'db-123', '--property', 'Missing'], { from: 'user' })
+      } catch {
+        // handleError calls process.exit
+      }
+
+      // Then
+      const allOutput = [...consoleOutput, ...consoleErrors].join('\n')
+      expect(allOutput).toContain('Property not found')
+    })
+  })
+
   describe('list', () => {
     test('lists databases via search', async () => {
       // Given
