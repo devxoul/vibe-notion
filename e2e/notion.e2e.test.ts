@@ -358,7 +358,7 @@ describe('Notion E2E Tests', () => {
       await waitForRateLimit()
     }, 15000)
 
-    test('database delete-property removes a property from schema', async () => {
+    test('database delete-property removes a text property from schema', async () => {
       expect(createdDbId).toBeTruthy()
 
       const addResult = await runNotionCLI([
@@ -394,6 +394,85 @@ describe('Notion E2E Tests', () => {
 
       await waitForRateLimit()
     }, 30000)
+
+    test('database delete-property removes a rollup property from schema', async () => {
+      // given — create source DB with a text property
+      const testId = generateTestId()
+      const srcResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        `e2e-rollup-src-${testId}`,
+        '--properties',
+        '{"prd_id":{"name":"PRD ID","type":"text"}}',
+      ])
+      expect(srcResult.exitCode).toBe(0)
+
+      const srcDb = parseJSON<{ id: string }>(srcResult.stdout)
+      expect(srcDb?.id).toBeTruthy()
+      const srcDbId = srcDb!.id
+      testDatabaseIds.push(srcDbId)
+
+      await waitForRateLimit()
+
+      // given — create target DB with relation + rollup
+      const tgtResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        `e2e-rollup-tgt-${testId}`,
+        '--properties',
+        JSON.stringify({
+          rel: { name: 'Source Rel', type: 'relation', collection_id: srcDbId },
+          rollup_prd: {
+            name: 'PRD Rollup',
+            type: 'rollup',
+            target_property: 'prd_id',
+            relation_property: 'rel',
+            target_property_type: 'text',
+          },
+        }),
+      ])
+      expect(tgtResult.exitCode).toBe(0)
+
+      const tgtDb = parseJSON<{ id: string; schema: Record<string, string> }>(tgtResult.stdout)
+      expect(tgtDb?.id).toBeTruthy()
+      expect(tgtDb?.schema?.['PRD Rollup']).toBe('rollup')
+      const tgtDbId = tgtDb!.id
+      testDatabaseIds.push(tgtDbId)
+
+      await waitForRateLimit()
+
+      // when — delete the rollup property
+      const result = await runNotionCLI([
+        'database',
+        'delete-property',
+        '--workspace-id',
+        workspaceId,
+        tgtDbId,
+        '--property',
+        'PRD Rollup',
+      ])
+
+      // then
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{ id: string; schema: Record<string, string> }>(result.stdout)
+      expect(data?.id).toBe(tgtDbId)
+      expect(data?.schema?.['PRD Rollup']).toBeUndefined()
+      expect(data?.schema?.['Source Rel']).toBe('relation')
+      expect(data?.schema?.['Name']).toBe('title')
+
+      await waitForRateLimit()
+    }, 60000)
   })
 
   // ── block ─────────────────────────────────────────────────────────────
