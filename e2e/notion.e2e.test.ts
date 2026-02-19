@@ -297,6 +297,43 @@ describe('Notion E2E Tests', () => {
 
       await waitForRateLimit()
     }, 15000)
+
+    test('database delete-property removes a property from schema', async () => {
+      expect(createdDbId).toBeTruthy()
+
+      const addResult = await runNotionCLI([
+        'database',
+        'update',
+        '--workspace-id',
+        workspaceId,
+        createdDbId,
+        '--properties',
+        '{"e2e_prop":{"name":"E2E Prop","type":"text"}}',
+      ])
+      expect(addResult.exitCode).toBe(0)
+
+      const added = parseJSON<{ id: string; schema: Record<string, string> }>(addResult.stdout)
+      expect(added?.schema?.['E2E Prop']).toBe('text')
+
+      await waitForRateLimit()
+
+      const result = await runNotionCLI([
+        'database',
+        'delete-property',
+        '--workspace-id',
+        workspaceId,
+        createdDbId,
+        '--property',
+        'E2E Prop',
+      ])
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{ id: string; schema: Record<string, string> }>(result.stdout)
+      expect(data?.id).toBe(createdDbId)
+      expect(data?.schema?.['E2E Prop']).toBeUndefined()
+
+      await waitForRateLimit()
+    }, 30000)
   })
 
   // ── block ─────────────────────────────────────────────────────────────

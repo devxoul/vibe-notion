@@ -131,6 +131,10 @@ type AddRowOptions = WorkspaceOptions & {
   properties?: string
 }
 
+type DeletePropertyOptions = WorkspaceOptions & {
+  property: string
+}
+
 type ViewGetOptions = WorkspaceOptions
 
 type ViewUpdateOptions = WorkspaceOptions & {
@@ -433,6 +437,67 @@ async function updateAction(rawCollectionId: string, options: UpdateOptions): Pr
               command: 'update',
               path: [],
               args: updateArgs,
+            },
+          ],
+        },
+      ],
+    })
+
+    const updated = await fetchCollection(creds.token_v2, collectionId)
+    console.log(formatOutput(formatCollectionValue(updated as Record<string, unknown>), options.pretty))
+  } catch (error) {
+    console.error(JSON.stringify({ error: (error as Error).message }))
+    process.exit(1)
+  }
+}
+
+async function deletePropertyAction(rawCollectionId: string, options: DeletePropertyOptions): Promise<void> {
+  const collectionId = formatNotionId(rawCollectionId)
+  try {
+    const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
+    const current = await fetchCollection(creds.token_v2, collectionId)
+    const schema = current.schema ?? {}
+
+    const nameToId: Record<string, string> = {}
+    for (const [propId, prop] of Object.entries(schema)) {
+      nameToId[prop.name] = propId
+    }
+
+    const propId = nameToId[options.property]
+    if (!propId) {
+      throw new Error(
+        `Unknown property: "${options.property}". Available: ${Object.values(schema)
+          .map((p) => p.name)
+          .join(', ')}`,
+      )
+    }
+
+    if (schema[propId].type === 'title') {
+      throw new Error('Cannot delete the title property')
+    }
+
+    const parentId = current.parent_id
+    if (!parentId) {
+      throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
+    }
+
+    const spaceId = await resolveSpaceId(creds.token_v2, parentId)
+    const newSchema = { ...schema }
+    delete newSchema[propId]
+
+    await internalRequest(creds.token_v2, 'saveTransactions', {
+      requestId: generateId(),
+      transactions: [
+        {
+          id: generateId(),
+          spaceId,
+          operations: [
+            {
+              pointer: { table: 'collection', id: collectionId, spaceId },
+              command: 'update',
+              path: [],
+              args: { schema: newSchema },
             },
           ],
         },
@@ -847,6 +912,15 @@ export const databaseCommand = new Command('database')
       .option('--properties <json>', 'Schema properties as JSON')
       .option('--pretty')
       .action(updateAction),
+  )
+  .addCommand(
+    new Command('delete-property')
+      .description('Delete a property from a database')
+      .argument('<collection_id>')
+      .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
+      .requiredOption('--property <name>', 'Property name to delete')
+      .option('--pretty')
+      .action(deletePropertyAction),
   )
   .addCommand(
     new Command('add-row')

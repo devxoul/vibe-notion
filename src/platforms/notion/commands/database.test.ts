@@ -1022,6 +1022,107 @@ describe('database update', () => {
     })
   })
 
+  test('merges new properties into existing schema', async () => {
+    mock.restore()
+    // Given
+    const mockGetResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockUpdateResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+                prop2: { name: 'Priority', type: 'select' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+
+    let callCount = 0
+    const mockInternalRequest = mock(() => {
+      callCount++
+      if (callCount === 1) return Promise.resolve(mockGetResponse)
+      if (callCount === 2) return Promise.resolve({})
+      return Promise.resolve(mockUpdateResponse)
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        [
+          'update',
+          'coll-1',
+          '--workspace-id',
+          'space-123',
+          '--properties',
+          '{"prop2":{"name":"Priority","type":"select"}}',
+        ],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then — saveTransactions called with merged schema
+    const saveTransactionCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveTransactionCall).toBeDefined()
+    const args = (saveTransactionCall?.[2] as any).transactions[0].operations[0].args
+    expect(args.schema).toEqual({
+      title: { name: 'Name', type: 'title' },
+      prop1: { name: 'Status', type: 'select' },
+      prop2: { name: 'Priority', type: 'select' },
+    })
+  })
+
   test('outputs current collection when no options provided', async () => {
     mock.restore()
     // Given
@@ -1081,5 +1182,239 @@ describe('database update', () => {
       name: 'Test DB',
       schema: { Name: 'title' },
     })
+  })
+})
+
+describe('database delete-property', () => {
+  test('removes property from schema by name', async () => {
+    mock.restore()
+    // Given
+    const mockGetResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+                prop2: { name: 'Priority', type: 'select' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockUpdatedResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop2: { name: 'Priority', type: 'select' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+
+    let callCount = 0
+    const mockInternalRequest = mock(() => {
+      callCount++
+      if (callCount === 1) return Promise.resolve(mockGetResponse)
+      if (callCount === 2) return Promise.resolve({})
+      return Promise.resolve(mockUpdatedResponse)
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['delete-property', 'coll-1', '--workspace-id', 'space-123', '--property', 'Status'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveCall).toBeDefined()
+    const args = (saveCall?.[2] as any).transactions[0].operations[0].args
+    expect(args.schema).toEqual({
+      title: { name: 'Name', type: 'title' },
+      prop2: { name: 'Priority', type: 'select' },
+    })
+    expect(args.schema.prop1).toBeUndefined()
+
+    const parsed = JSON.parse(output[0])
+    expect(parsed.schema).toEqual({ Name: 'title', Priority: 'select' })
+  })
+
+  test('errors when property name not found', async () => {
+    mock.restore()
+    // Given
+    const mockResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockInternalRequest = mock(() => Promise.resolve(mockResponse))
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const originalExit = process.exit
+    process.exit = mockExit as any
+
+    const { databaseCommand } = await import('./database')
+
+    const errors: string[] = []
+    const originalError = console.error
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['delete-property', 'coll-1', '--workspace-id', 'space-123', '--property', 'NonExistent'],
+        { from: 'user' },
+      )
+    } catch {
+      // expected
+    } finally {
+      console.error = originalError
+      process.exit = originalExit
+    }
+
+    // Then
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0]).toContain('Unknown property')
+    expect(errors[0]).toContain('NonExistent')
+  })
+
+  test('errors when trying to delete title property', async () => {
+    mock.restore()
+    // Given
+    const mockResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockInternalRequest = mock(() => Promise.resolve(mockResponse))
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const originalExit = process.exit
+    process.exit = mockExit as any
+
+    const { databaseCommand } = await import('./database')
+
+    const errors: string[] = []
+    const originalError = console.error
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['delete-property', 'coll-1', '--workspace-id', 'space-123', '--property', 'Name'],
+        { from: 'user' },
+      )
+    } catch {
+      // expected
+    } finally {
+      console.error = originalError
+      process.exit = originalExit
+    }
+
+    // Then
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0]).toContain('Cannot delete the title property')
   })
 })
