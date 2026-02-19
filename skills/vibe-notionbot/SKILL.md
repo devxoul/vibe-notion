@@ -196,12 +196,17 @@ Common errors from the Notion API:
 
 ## Troubleshooting
 
-If a `vibe-notionbot` command fails with "command not found", the CLI is not installed. Ask the user which package manager they prefer and offer these options:
+### `vibe-notionbot: command not found`
 
-- `npm install -g vibe-notion`
-- `yarn global add vibe-notion`
-- `pnpm add -g vibe-notion`
-- `bun add -g vibe-notion`
+The `vibe-notion` package is not installed. Run it directly using a package runner. Ask the user which one to use:
+
+```bash
+npx -p vibe-notion vibe-notionbot ...
+bunx -p vibe-notion vibe-notionbot ...
+pnpm dlx --package vibe-notion vibe-notionbot ...
+```
+
+If you already know the user's preferred package runner, use it directly instead of asking.
 
 ## Limitations
 
