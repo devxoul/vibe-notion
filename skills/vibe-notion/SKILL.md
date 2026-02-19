@@ -196,6 +196,9 @@ vibe-notion database update <collection_id> --workspace-id <workspace_id> --titl
 vibe-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --pretty
 vibe-notion database add-row <collection_id> --workspace-id <workspace_id> --title "Row title" --properties '{"Status":"In Progress","Due":{"start":"2025-03-01"}}' --pretty
 
+# Delete a property from a database (cannot delete the title property)
+vibe-notion database delete-property <collection_id> --workspace-id <workspace_id> --property "Status" --pretty
+
 # Get view configuration and property visibility
 vibe-notion database view-get <view_id> --workspace-id <workspace_id> --pretty
 
@@ -322,6 +325,7 @@ vibe-notion comment get <comment_id> --workspace-id <workspace_id> --pretty
 vibe-notion search "query" --workspace-id <workspace_id> --pretty
 vibe-notion search "query" --workspace-id <workspace_id> --limit 10 --pretty
 vibe-notion search "query" --workspace-id <workspace_id> --start-cursor <offset> --pretty
+vibe-notion search "query" --workspace-id <workspace_id> --sort lastEdited --pretty
 ```
 
 ### User Commands

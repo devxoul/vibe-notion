@@ -86,6 +86,9 @@ vibe-notionbot database create --parent <page_id> --title "My Database" --proper
 # Update a database schema or title
 vibe-notionbot database update <database_id> --title "Updated Title"
 
+# Delete a property from a database
+vibe-notionbot database delete-property <database_id> --property "Status"
+
 # List all databases accessible by the integration
 vibe-notionbot database list
 vibe-notionbot database list --page-size 10 --start-cursor <cursor>
