@@ -3,7 +3,7 @@
 // ── notionbot (official API) ────────────────────────────────────────────
 
 export const NOTIONBOT_E2E_PAGE_ID = '305c0fcf-90b3-802a-aebc-db1e05bb6926'
-export const NOTIONBOT_WORKSPACE_NAME = 'Agent Notion'
+export const NOTIONBOT_WORKSPACE_NAME = 'Vibe Notion'
 export const NOTIONBOT_BOT_ID = '98cf032f-d67b-457b-b2b3-2063f1cf5c68'
 export const NOTIONBOT_KNOWN_USER_ID = '562f9c80-1b28-46e2-85f8-91227533d192'
 

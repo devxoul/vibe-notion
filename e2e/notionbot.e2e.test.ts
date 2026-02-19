@@ -4,6 +4,7 @@ import {
   NOTIONBOT_E2E_PAGE_ID,
   NOTIONBOT_BOT_ID,
   NOTIONBOT_KNOWN_USER_ID,
+  NOTIONBOT_WORKSPACE_NAME,
   validateNotionBotEnvironment,
 } from './config'
 
@@ -89,7 +90,7 @@ describe('NotionBot E2E Tests', () => {
       expect(data?.integration?.id).toBeTruthy()
       expect(data?.integration?.name).toBeTruthy()
       expect(data?.integration?.type).toBe('bot')
-      expect(data?.integration?.workspace_name).toBe('Agent Notion')
+      expect(data?.integration?.workspace_name).toBe(NOTIONBOT_WORKSPACE_NAME)
 
       await waitForRateLimit()
     }, 15000)
@@ -181,22 +182,60 @@ describe('NotionBot E2E Tests', () => {
     let createdDbId = ''
 
     beforeAll(async () => {
-      // database create CLI is broken due to notionVersion '2022-06-28' stripping properties.
-      // Create via raw request as workaround to test get/query/list.
       const testId = generateTestId()
       const result = await runCLI([
         'database', 'create',
         '--parent', containerId,
         '--title', `e2e-db-${testId}`,
       ])
+      expect(result.exitCode).toBe(0)
 
-      if (result.exitCode === 0) {
-        const data = parseJSON<{ id: string }>(result.stdout)
-        if (data?.id) {
-          createdDbId = data.id
-          testDatabaseIds.push(createdDbId)
-        }
-      }
+      const data = parseJSON<{ id: string }>(result.stdout)
+      expect(data?.id).toBeTruthy()
+
+      createdDbId = data!.id
+      testDatabaseIds.push(createdDbId)
+      await waitForRateLimit()
+    }, 15000)
+
+    test('database create with select properties', async () => {
+      const testId = generateTestId()
+      const properties = JSON.stringify({
+        Name: { title: {} },
+        Status: { select: { options: [{ name: 'Open', color: 'green' }, { name: 'Closed', color: 'red' }] } },
+      })
+      const result = await runCLI([
+        'database', 'create',
+        '--parent', containerId,
+        '--title', `e2e-select-db-${testId}`,
+        '--properties', properties,
+      ])
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{ id: string; properties: Record<string, string> }>(result.stdout)
+      expect(data?.id).toBeTruthy()
+      expect(data?.properties?.Status).toBe('select')
+
+      testDatabaseIds.push(data!.id)
+      await waitForRateLimit()
+    }, 15000)
+
+    test('database update adds select properties', async () => {
+      expect(createdDbId).toBeTruthy()
+
+      const properties = JSON.stringify({
+        Priority: { select: { options: [{ name: 'High' }, { name: 'Low' }] } },
+      })
+      const result = await runCLI([
+        'database', 'update', createdDbId,
+        '--properties', properties,
+      ])
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{ id: string; properties: Record<string, string> }>(result.stdout)
+      expect(data?.id).toBe(createdDbId)
+      expect(data?.properties?.Priority).toBe('select')
+
       await waitForRateLimit()
     }, 15000)
 
@@ -212,7 +251,7 @@ describe('NotionBot E2E Tests', () => {
     }, 15000)
 
     test('database get retrieves a database', async () => {
-      if (!createdDbId) return
+      expect(createdDbId).toBeTruthy()
 
       const result = await runCLI(['database', 'get', createdDbId])
       expect(result.exitCode).toBe(0)
@@ -225,7 +264,7 @@ describe('NotionBot E2E Tests', () => {
     }, 15000)
 
     test('database query returns results', async () => {
-      if (!createdDbId) return
+      expect(createdDbId).toBeTruthy()
 
       await waitForRateLimit()
 
@@ -369,7 +408,7 @@ describe('NotionBot E2E Tests', () => {
       expect(data).not.toBeNull()
       expect(data?.id).toBe(NOTIONBOT_BOT_ID)
       expect(data?.type).toBe('bot')
-      expect(data?.workspace_name).toBe('Agent Notion')
+      expect(data?.workspace_name).toBe(NOTIONBOT_WORKSPACE_NAME)
 
       await waitForRateLimit()
     }, 15000)
