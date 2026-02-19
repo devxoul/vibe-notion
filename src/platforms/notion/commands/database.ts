@@ -486,6 +486,7 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
 
     const nameToId: Record<string, string> = {}
     for (const [propId, prop] of Object.entries(schema)) {
+      if (prop.alive === false) continue
       nameToId[prop.name] = propId
     }
 
@@ -493,6 +494,7 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
     if (!propId) {
       throw new Error(
         `Unknown property: "${options.property}". Available: ${Object.values(schema)
+          .filter((p) => p.alive !== false)
           .map((p) => p.name)
           .join(', ')}`,
       )
@@ -508,8 +510,6 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
     }
 
     const spaceId = await resolveSpaceId(creds.token_v2, parentId)
-    const newSchema = { ...schema }
-    delete newSchema[propId]
 
     await internalRequest(creds.token_v2, 'saveTransactions', {
       requestId: generateId(),
@@ -521,8 +521,8 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
             {
               pointer: { table: 'collection', id: collectionId, spaceId },
               command: 'update',
-              path: [],
-              args: { schema: newSchema },
+              path: ['schema', propId],
+              args: { alive: false },
             },
           ],
         },

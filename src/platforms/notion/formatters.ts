@@ -230,6 +230,8 @@ export function simplifyCollectionSchema(schema: Record<string, Record<string, u
   const simplified: Record<string, string> = {}
 
   for (const entry of Object.values(schema)) {
+    if (entry.alive === false) continue
+
     const name = toOptionalString(entry.name)
     const type = toOptionalString(entry.type)
 

@@ -580,6 +580,24 @@ describe('simplifyCollectionSchema', () => {
       Status: 'select',
     })
   })
+
+  test('excludes properties with alive:false', () => {
+    // Given
+    const schema = {
+      abc1: { name: 'Name', type: 'title' },
+      def2: { name: 'Status', type: 'select' },
+      ghi3: { name: 'Deleted Prop', type: 'text', alive: false },
+    }
+
+    // When
+    const result = simplifyCollectionSchema(schema)
+
+    // Then
+    expect(result).toEqual({
+      Name: 'title',
+      Status: 'select',
+    })
+  })
 })
 
 describe('extractCollectionName', () => {
