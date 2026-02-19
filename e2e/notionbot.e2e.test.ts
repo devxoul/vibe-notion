@@ -110,9 +110,9 @@ describe('NotionBot E2E Tests', () => {
       ])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; object: string }>(result.stdout)
+      const data = parseJSON<{ id: string; title: string }>(result.stdout)
       expect(data?.id).toBeTruthy()
-      expect(data?.object).toBe('page')
+      expect(data?.title).toBeTruthy()
 
       createdPageId = data!.id
       testPageIds.push(createdPageId)
@@ -125,9 +125,9 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['page', 'get', createdPageId])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; object: string }>(result.stdout)
+      const data = parseJSON<{ id: string; title: string }>(result.stdout)
       expect(data?.id).toBe(createdPageId)
-      expect(data?.object).toBe('page')
+      expect(data?.title).toBeTruthy()
 
       await waitForRateLimit()
     }, 15000)
@@ -243,9 +243,9 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['database', 'list', '--page-size', '5'])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ results: unknown[] }>(result.stdout)
-      expect(data?.results).toBeTruthy()
-      expect(Array.isArray(data?.results)).toBe(true)
+      const data = parseJSON<Array<{ id: string; title: string; url: string }>>(result.stdout)
+      expect(data).not.toBeNull()
+      expect(Array.isArray(data)).toBe(true)
 
       await waitForRateLimit()
     }, 15000)
@@ -256,9 +256,9 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['database', 'get', createdDbId])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; object: string }>(result.stdout)
+      const data = parseJSON<{ id: string; title: string }>(result.stdout)
       expect(data?.id).toBe(createdDbId)
-      expect(data?.object).toBe('database')
+      expect(data?.title).toBeTruthy()
 
       await waitForRateLimit()
     }, 15000)
@@ -271,8 +271,7 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['database', 'query', createdDbId])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ results: unknown[]; object: string }>(result.stdout)
-      expect(data?.object).toBe('list')
+      const data = parseJSON<{ results: unknown[]; has_more: boolean }>(result.stdout)
       expect(Array.isArray(data?.results)).toBe(true)
 
       await waitForRateLimit()
@@ -301,12 +300,11 @@ describe('NotionBot E2E Tests', () => {
       ])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<Array<{ results: Array<{ id: string; type: string }> }>>(result.stdout)
+      const data = parseJSON<{ results: Array<{ id: string; type: string }> }>(result.stdout)
       expect(data).not.toBeNull()
-      expect(data!.length).toBeGreaterThan(0)
-      expect(data![0].results.length).toBeGreaterThan(0)
+      expect(data!.results.length).toBeGreaterThan(0)
 
-      appendedBlockId = data![0].results[0].id
+      appendedBlockId = data!.results[0].id
       testBlockIds.push(appendedBlockId)
       await waitForRateLimit()
     }, 15000)
@@ -328,8 +326,7 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['block', 'children', containerId])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ results: Array<{ id: string }>; object: string }>(result.stdout)
-      expect(data?.object).toBe('list')
+      const data = parseJSON<{ results: Array<{ id: string }>; has_more: boolean }>(result.stdout)
       expect(Array.isArray(data?.results)).toBe(true)
       expect(data!.results.length).toBeGreaterThan(0)
 
@@ -351,8 +348,8 @@ describe('NotionBot E2E Tests', () => {
         'block', 'append', containerId,
         '--content', blockContent,
       ])
-      const appended = parseJSON<Array<{ results: Array<{ id: string }> }>>(appendResult.stdout)
-      const blockToDelete = appended![0].results[0].id
+      const appended = parseJSON<{ results: Array<{ id: string }> }>(appendResult.stdout)
+      const blockToDelete = appended!.results[0].id
       expect(blockToDelete).toBeTruthy()
 
       await waitForRateLimit()
@@ -360,9 +357,9 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['block', 'delete', blockToDelete])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; archived: boolean }>(result.stdout)
+      const data = parseJSON<{ id: string; deleted: boolean }>(result.stdout)
       expect(data?.id).toBe(blockToDelete)
-      expect(data?.archived).toBe(true)
+      expect(data?.deleted).toBe(true)
 
       await waitForRateLimit()
     }, 15000)
@@ -431,7 +428,6 @@ describe('NotionBot E2E Tests', () => {
   describe('comment', () => {
     let commentPageId = ''
     let createdCommentId = ''
-    let discussionId = ''
 
     beforeAll(async () => {
       const testId = generateTestId()
@@ -457,14 +453,12 @@ describe('NotionBot E2E Tests', () => {
       ])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; object: string; discussion_id: string }>(result.stdout)
+      const data = parseJSON<{ id: string; text: string; author: { id: string } }>(result.stdout)
       expect(data).not.toBeNull()
       expect(data?.id).toBeTruthy()
-      expect(data?.object).toBe('comment')
-      expect(data?.discussion_id).toBeTruthy()
+      expect(data?.text).toBeTruthy()
 
       createdCommentId = data!.id
-      discussionId = data!.discussion_id
       await waitForRateLimit()
     }, 15000)
 
@@ -474,7 +468,7 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['comment', 'list', '--page', commentPageId])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ results: Array<{ id: string; object: string }> }>(result.stdout)
+      const data = parseJSON<{ results: Array<{ id: string; text: string }> }>(result.stdout)
       expect(data).not.toBeNull()
       expect(Array.isArray(data?.results)).toBe(true)
       expect(data!.results.length).toBeGreaterThan(0)
@@ -488,11 +482,10 @@ describe('NotionBot E2E Tests', () => {
       const result = await runCLI(['comment', 'get', createdCommentId])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; object: string; discussion_id: string }>(result.stdout)
+      const data = parseJSON<{ id: string; text: string; author: { id: string } }>(result.stdout)
       expect(data).not.toBeNull()
       expect(data?.id).toBe(createdCommentId)
-      expect(data?.object).toBe('comment')
-      expect(data?.discussion_id).toBe(discussionId)
+      expect(data?.text).toBeTruthy()
 
       await waitForRateLimit()
     }, 15000)

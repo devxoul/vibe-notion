@@ -47,7 +47,7 @@ export async function validateNotionBotEnvironment() {
 
 export const NOTION_E2E_PAGE_ID = '305c0fcf-90b3-802a-aebc-db1e05bb6926'
 
-export async function validateNotionEnvironment() {
+export async function validateNotionEnvironment(): Promise<string> {
   const { runNotionCLI, parseJSON } = await import('./helpers')
 
   const result = await runNotionCLI(['auth', 'status'])
@@ -66,4 +66,19 @@ export async function validateNotionEnvironment() {
       'Please run `vibe-notion auth extract` to extract token_v2 from the Notion desktop app.'
     )
   }
+
+  const wsResult = await runNotionCLI(['workspace', 'list'])
+  if (wsResult.exitCode !== 0) {
+    throw new Error(
+      'Failed to list workspaces. ' +
+      `Error: ${wsResult.stderr || wsResult.stdout}`
+    )
+  }
+
+  const workspaces = parseJSON<Array<{ id: string; name?: string }>>(wsResult.stdout)
+  if (!workspaces || workspaces.length === 0) {
+    throw new Error('No workspaces found. Please ensure your Notion account has at least one workspace.')
+  }
+
+  return workspaces[0].id
 }
