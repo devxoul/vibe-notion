@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { internalRequest, setActiveUserId } from '@/platforms/notion/client'
 import { CredentialManager, type NotionCredentials } from '@/platforms/notion/credential-manager'
 import { collectBacklinkUserIds } from '@/platforms/notion/formatters'
+import { TokenExtractor } from '@/platforms/notion/token-extractor'
 
 export type CommandOptions = { pretty?: boolean }
 
@@ -18,11 +19,22 @@ export function generateId(): string {
 export async function getCredentialsOrExit(): Promise<NotionCredentials> {
   const manager = new CredentialManager()
   const creds = await manager.getCredentials()
-  if (!creds) {
-    console.error(JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }))
-    process.exit(1)
+  if (creds) return creds
+
+  // Auto-extract from Notion desktop app
+  try {
+    const extractor = new TokenExtractor()
+    const extracted = await extractor.extract()
+    if (extracted) {
+      await manager.setCredentials(extracted)
+      return extracted
+    }
+  } catch {
+    // Extraction failed, fall through to error
   }
-  return creds
+
+  console.error(JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }))
+  process.exit(1)
 }
 
 export async function resolveSpaceId(tokenV2: string, blockId: string): Promise<string> {

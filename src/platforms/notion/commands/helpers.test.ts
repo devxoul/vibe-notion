@@ -6,11 +6,15 @@ import { randomUUID } from 'node:crypto'
 
 let _mockInternalRequest: (...args: unknown[]) => unknown = () => Promise.resolve({})
 let _mockGetCredentials: (...args: unknown[]) => unknown = () => Promise.resolve(null)
+let _mockExtract: (...args: unknown[]) => unknown = () => Promise.resolve(null)
+let _mockSetCredentials: (...args: unknown[]) => unknown = () => Promise.resolve()
 let _capturedActiveUserId: string | undefined
 
 afterEach(() => {
   _mockInternalRequest = () => Promise.resolve({})
   _mockGetCredentials = () => Promise.resolve(null)
+  _mockExtract = () => Promise.resolve(null)
+  _mockSetCredentials = () => Promise.resolve()
   _capturedActiveUserId = undefined
 })
 
@@ -23,11 +27,21 @@ function generateId(): string {
 
 async function getCredentialsOrExit() {
   const creds = await _mockGetCredentials()
-  if (!creds) {
-    console.error(JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }))
-    process.exit(1)
+  if (creds) return creds
+
+  // Auto-extract from Notion desktop app
+  try {
+    const extracted = await _mockExtract()
+    if (extracted) {
+      await _mockSetCredentials(extracted)
+      return extracted
+    }
+  } catch {
+    // Extraction failed, fall through to error
   }
-  return creds
+
+  console.error(JSON.stringify({ error: 'Not authenticated. Run: vibe-notion auth extract' }))
+  process.exit(1)
 }
 
 async function resolveSpaceId(tokenV2: string, blockId: string): Promise<string> {
@@ -154,8 +168,9 @@ describe('getCredentialsOrExit', () => {
     }
   })
 
-  test('logs error message when no credentials', async () => {
+  test('logs error message when no credentials and auto-extract fails', async () => {
     _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.resolve(null))
 
     const mockExit = mock(() => {
       throw new Error('process.exit called')
@@ -174,6 +189,55 @@ describe('getCredentialsOrExit', () => {
       )
     } finally {
       console.error = originalError
+      process.exit = originalExit
+    }
+  })
+
+  test('auto-extracts and returns credentials when no stored credentials', async () => {
+    const extracted = { token_v2: 'extracted-token', user_id: 'user-1' }
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.resolve(extracted))
+    _mockSetCredentials = mock(() => Promise.resolve())
+
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+    const originalExit = process.exit
+    process.exit = mockExit as never
+
+    try {
+      const result = await getCredentialsOrExit()
+      expect(result).toEqual(extracted)
+      expect(mockExit).not.toHaveBeenCalled()
+    } finally {
+      process.exit = originalExit
+    }
+  })
+
+  test('saves auto-extracted credentials', async () => {
+    const extracted = { token_v2: 'extracted-token', user_id: 'user-1' }
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.resolve(extracted))
+    _mockSetCredentials = mock(() => Promise.resolve())
+
+    await getCredentialsOrExit()
+    expect(_mockSetCredentials).toHaveBeenCalledWith(extracted)
+  })
+
+  test('exits when auto-extraction throws', async () => {
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.reject(new Error('Notion directory not found')))
+
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+    const originalExit = process.exit
+    process.exit = mockExit as never
+
+    try {
+      await expect(getCredentialsOrExit()).rejects.toThrow('process.exit called')
+      expect(mockExit).toHaveBeenCalledWith(1)
+    } finally {
       process.exit = originalExit
     }
   })
