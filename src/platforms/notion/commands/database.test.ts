@@ -3301,4 +3301,310 @@ describe('database view-update', () => {
     expect(newProps.map((prop: { property: string }) => prop.property)).toEqual(['title', 'prop1', 'prop2'])
     expect(output.length).toBeGreaterThan(0)
   })
+
+  test('resize sets column widths via --resize JSON', async () => {
+    mock.restore()
+    // Given
+    const mockViewResponse = {
+      recordMap: {
+        collection_view: {
+          'view-1': {
+            value: {
+              id: 'view-1',
+              type: 'table',
+              name: 'Default view',
+              format: {
+                collection_pointer: { id: 'coll-1', spaceId: 'space-123' },
+                table_properties: [
+                  { property: 'title', visible: true },
+                  { property: 'prop1', visible: true },
+                  { property: 'prop2', visible: false },
+                ],
+              },
+              parent_id: 'block-1',
+            },
+          },
+        },
+      },
+    }
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+                prop2: { name: 'Priority', type: 'select' },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') return Promise.resolve({})
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection_view') {
+          return Promise.resolve(mockViewResponse)
+        }
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+      }
+      return Promise.resolve({})
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['view-update', 'view-1', '--workspace-id', 'space-123', '--resize', '{"Name":200,"Status":150}'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveCall).toBeDefined()
+    const operations = (saveCall?.[2] as any).transactions[0].operations
+    const newProps = operations[0].args as Array<{ property: string; width?: number }>
+    const nameEntry = newProps.find((p) => p.property === 'title')
+    const statusEntry = newProps.find((p) => p.property === 'prop1')
+    const priorityEntry = newProps.find((p) => p.property === 'prop2')
+    expect(nameEntry?.width).toBe(200)
+    expect(statusEntry?.width).toBe(150)
+    expect(priorityEntry?.width).toBeUndefined()
+    expect(output.length).toBeGreaterThan(0)
+  })
+
+  test('resize errors on unknown property name', async () => {
+    mock.restore()
+    // Given
+    const mockViewResponse = {
+      recordMap: {
+        collection_view: {
+          'view-1': {
+            value: {
+              id: 'view-1',
+              type: 'table',
+              name: 'Default view',
+              format: {
+                collection_pointer: { id: 'coll-1', spaceId: 'space-123' },
+                table_properties: [{ property: 'title', visible: true }],
+              },
+              parent_id: 'block-1',
+            },
+          },
+        },
+      },
+    }
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection_view') {
+          return Promise.resolve(mockViewResponse)
+        }
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+      }
+      return Promise.resolve({})
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const originalExit = process.exit
+    process.exit = mockExit as any
+
+    const { databaseCommand } = await import('./database')
+
+    const errors: string[] = []
+    const originalError = console.error
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['view-update', 'view-1', '--workspace-id', 'space-123', '--resize', '{"NonExistent":200}'],
+        { from: 'user' },
+      )
+    } catch {
+      // expected
+    } finally {
+      console.error = originalError
+      process.exit = originalExit
+    }
+
+    // Then
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0]).toContain('Unknown property')
+    expect(errors[0]).toContain('NonExistent')
+  })
+
+  test('resize combined with reorder and show', async () => {
+    mock.restore()
+    // Given
+    const mockViewResponse = {
+      recordMap: {
+        collection_view: {
+          'view-1': {
+            value: {
+              id: 'view-1',
+              type: 'table',
+              name: 'Default view',
+              format: {
+                collection_pointer: { id: 'coll-1', spaceId: 'space-123' },
+                table_properties: [
+                  { property: 'title', visible: true },
+                  { property: 'prop1', visible: false },
+                  { property: 'prop2', visible: true },
+                ],
+              },
+              parent_id: 'block-1',
+            },
+          },
+        },
+      },
+    }
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+                prop2: { name: 'Priority', type: 'select' },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') return Promise.resolve({})
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection_view') {
+          return Promise.resolve(mockViewResponse)
+        }
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+      }
+      return Promise.resolve({})
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        [
+          'view-update',
+          'view-1',
+          '--workspace-id',
+          'space-123',
+          '--show',
+          'Status',
+          '--reorder',
+          'Status,Name',
+          '--resize',
+          '{"Status":250}',
+        ],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveCall).toBeDefined()
+    const operations = (saveCall?.[2] as any).transactions[0].operations
+    const newProps = operations[0].args as Array<{ property: string; visible: boolean; width?: number }>
+    expect(newProps.map((p) => p.property)).toEqual(['prop1', 'title', 'prop2'])
+    expect(newProps.find((p) => p.property === 'prop1')?.visible).toBe(true)
+    expect(newProps.find((p) => p.property === 'prop1')?.width).toBe(250)
+    expect(output.length).toBeGreaterThan(0)
+  })
 })

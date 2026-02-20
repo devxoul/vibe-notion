@@ -153,6 +153,7 @@ type ViewUpdateOptions = WorkspaceOptions & {
   show?: string
   hide?: string
   reorder?: string
+  resize?: string
 }
 
 function parseSchemaProperties(raw?: string): CollectionSchema {
@@ -1024,15 +1025,23 @@ async function resolveCollectionFromView(tokenV2: string, view: ViewRecord['valu
 function buildOrderedProperties(
   viewProps: ViewProperty[],
   schema: CollectionSchema,
-): Array<{ name: string; type: string; visible: boolean }> {
+): Array<{ name: string; type: string; visible: boolean; width?: number }> {
   const seen = new Set<string>()
-  const properties: Array<{ name: string; type: string; visible: boolean }> = []
+  const properties: Array<{ name: string; type: string; visible: boolean; width?: number }> = []
 
   for (const vp of viewProps) {
     const prop = schema[vp.property]
     if (!prop) continue
     seen.add(vp.property)
-    properties.push({ name: prop.name, type: prop.type, visible: vp.visible })
+    const entry: { name: string; type: string; visible: boolean; width?: number } = {
+      name: prop.name,
+      type: prop.type,
+      visible: vp.visible,
+    }
+    if (vp.width !== undefined) {
+      entry.width = vp.width
+    }
+    properties.push(entry)
   }
 
   for (const [propId, prop] of Object.entries(schema)) {
@@ -1081,8 +1090,8 @@ async function viewUpdateAction(rawViewId: string, options: ViewUpdateOptions): 
     const creds = await getCredentialsOrExit()
     await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
 
-    if (!options.show && !options.hide && !options.reorder) {
-      throw new Error('Provide --show, --hide, or --reorder with comma-separated property names')
+    if (!options.show && !options.hide && !options.reorder && !options.resize) {
+      throw new Error('Provide --show, --hide, --reorder, or --resize')
     }
 
     const view = await fetchView(creds.token_v2, viewId)
@@ -1174,6 +1183,24 @@ async function viewUpdateAction(rawViewId: string, options: ViewUpdateOptions): 
       updatedProps.clear()
       for (const [id, prop] of reordered) {
         updatedProps.set(id, prop)
+      }
+    }
+
+    if (options.resize) {
+      const resizeMap = JSON.parse(options.resize) as Record<string, number>
+      for (const [name, width] of Object.entries(resizeMap)) {
+        const propId = nameToId[name]
+        if (!propId) {
+          throw new Error(
+            `Unknown property: "${name}". Available: ${Object.values(schema)
+              .map((p) => p.name)
+              .join(', ')}`,
+          )
+        }
+        const entry = updatedProps.get(propId)
+        if (entry) {
+          entry.width = width
+        }
       }
     }
 
@@ -1314,12 +1341,16 @@ export const databaseCommand = new Command('database')
   )
   .addCommand(
     new Command('view-update')
-      .description('Update property visibility and column order on a view')
+      .description('Update property visibility, column order, and column widths on a view')
       .argument('<view_id>')
       .requiredOption('--workspace-id <id>', 'Workspace ID (use `workspace list` to find it)')
       .option('--show <names>', 'Comma-separated property names to show')
       .option('--hide <names>', 'Comma-separated property names to hide')
       .option('--reorder <names>', 'Comma-separated property names in desired column order')
+      .option(
+        '--resize <json>',
+        'JSON object mapping property names to widths in pixels (e.g. \'{"Name":200,"Status":150}\')',
+      )
       .option('--pretty', 'Pretty print JSON output')
       .action(viewUpdateAction),
   )
