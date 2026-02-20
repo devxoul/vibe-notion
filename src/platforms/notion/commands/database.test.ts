@@ -924,6 +924,150 @@ describe('database create', () => {
       schema: { Name: 'title' },
     })
   })
+
+  test('enhances relation properties with v2 fields and sets rollup_type', async () => {
+    mock.restore()
+    // Given — target collection schema for rollup resolution
+    const mockTargetCollectionResponse = {
+      recordMap: {
+        collection: {
+          'target-coll': {
+            value: {
+              id: 'target-coll',
+              name: [['Target DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                src_id: { name: 'Source ID', type: 'text' },
+              },
+              parent_id: 'block-2',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockCreatedResponse = {
+      recordMap: {
+        collection: {
+          'mock-uuid': {
+            value: {
+              id: 'mock-uuid',
+              name: [['With Rollup']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                rel: { name: 'My Rel', type: 'relation', collection_id: 'target-coll' },
+                my_rollup: {
+                  name: 'My Rollup',
+                  type: 'rollup',
+                  relation_property: 'rel',
+                  target_property: 'src_id',
+                  target_property_type: 'text',
+                },
+              },
+              parent_id: 'mock-uuid',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') return Promise.resolve({})
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string; id: string } }>
+        if (requests[0]?.pointer.id === 'target-coll') {
+          return Promise.resolve(mockTargetCollectionResponse)
+        }
+        // For resolveSpaceId or final fetch
+        return Promise.resolve(mockCreatedResponse)
+      }
+      return Promise.resolve(mockCreatedResponse)
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        [
+          'create',
+          '--workspace-id',
+          'space-123',
+          '--parent',
+          'parent-123',
+          '--title',
+          'With Rollup',
+          '--properties',
+          JSON.stringify({
+            rel: { name: 'My Rel', type: 'relation', collection_id: 'target-coll' },
+            my_rollup: {
+              name: 'My Rollup',
+              type: 'rollup',
+              relation_property: 'rel',
+              target_property: 'Source ID',
+            },
+          }),
+        ],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then — check the schema sent in saveTransactions
+    const saveTransactionCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveTransactionCall).toBeDefined()
+    const args = (saveTransactionCall?.[2] as any).transactions[0].operations[0].args
+    const schema = args.schema
+
+    // Relation should have v2 fields
+    expect(schema.rel).toEqual(
+      expect.objectContaining({
+        name: 'My Rel',
+        type: 'relation',
+        version: 'v2',
+        property: 'rel',
+        collection_id: 'target-coll',
+        autoRelate: { enabled: false },
+        collection_pointer: { id: 'target-coll', table: 'collection', spaceId: 'space-123' },
+      }),
+    )
+
+    // Rollup should have rollup_type and resolved references
+    expect(schema.my_rollup).toEqual(
+      expect.objectContaining({
+        name: 'My Rollup',
+        type: 'rollup',
+        relation_property: 'rel',
+        target_property: 'src_id',
+        target_property_type: 'text',
+        rollup_type: 'relation',
+      }),
+    )
+  })
 })
 
 describe('database update', () => {

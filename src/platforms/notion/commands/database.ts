@@ -176,6 +176,33 @@ function buildNameToKey(schema: CollectionSchema): Record<string, string> {
   return map
 }
 
+function resolveRelationProperties(
+  properties: CollectionSchema,
+  mergedSchema: CollectionSchema,
+  spaceId: string,
+): void {
+  for (const [key, prop] of Object.entries(properties)) {
+    if (prop.type !== 'relation') continue
+    const collectionId = prop.collection_id as string | undefined
+    if (!collectionId) continue
+
+    const schemaKey = mergedSchema[key] ? key : Object.keys(mergedSchema).find((k) => mergedSchema[k] === prop)
+    if (schemaKey) {
+      prop.property = schemaKey
+    }
+
+    prop.version = 'v2'
+    if (!prop.autoRelate) {
+      prop.autoRelate = { enabled: false }
+    }
+    prop.collection_pointer = {
+      id: collectionId,
+      table: 'collection',
+      spaceId,
+    }
+  }
+}
+
 async function resolveRollupReferences(
   properties: CollectionSchema,
   mergedSchema: CollectionSchema,
@@ -212,15 +239,41 @@ async function resolveRollupReferences(
       if (!prop.target_property_type) {
         prop.target_property_type = targetSchema[targetRef].type
       }
-      continue
+    } else {
+      const targetNameToKey = buildNameToKey(targetSchema)
+      const resolvedKey = targetNameToKey[targetRef]
+      if (resolvedKey) {
+        prop.target_property = resolvedKey
+        if (!prop.target_property_type) {
+          prop.target_property_type = targetSchema[resolvedKey].type
+        }
+      }
     }
 
-    const targetNameToKey = buildNameToKey(targetSchema)
-    const resolvedKey = targetNameToKey[targetRef]
-    if (resolvedKey) {
-      prop.target_property = resolvedKey
-      if (!prop.target_property_type) {
-        prop.target_property_type = targetSchema[resolvedKey].type
+    if (!prop.rollup_type) {
+      const aggregation = prop.aggregation as string | undefined
+      if (!aggregation || aggregation === 'show_original' || aggregation === 'show_unique') {
+        prop.rollup_type = 'relation'
+      } else if (
+        aggregation === 'count' ||
+        aggregation === 'count_values' ||
+        aggregation === 'count_per_group' ||
+        aggregation === 'sum' ||
+        aggregation === 'average' ||
+        aggregation === 'median' ||
+        aggregation === 'min' ||
+        aggregation === 'max' ||
+        aggregation === 'range' ||
+        aggregation === 'percent_empty' ||
+        aggregation === 'percent_not_empty' ||
+        aggregation === 'percent_checked' ||
+        aggregation === 'percent_unchecked'
+      ) {
+        prop.rollup_type = 'number'
+      } else if (aggregation === 'earliest_date' || aggregation === 'latest_date' || aggregation === 'date_range') {
+        prop.rollup_type = 'date'
+      } else {
+        prop.rollup_type = 'relation'
       }
     }
   }
@@ -526,6 +579,7 @@ async function createAction(options: CreateOptions): Promise<void> {
       title: { name: 'Name', type: 'title' },
       ...parsedProperties,
     }
+    resolveRelationProperties(parsedProperties, mergedSchema, spaceId)
     await resolveRollupReferences(parsedProperties, mergedSchema, creds.token_v2)
 
     await internalRequest(creds.token_v2, 'saveTransactions', {
@@ -631,6 +685,7 @@ async function updateAction(rawCollectionId: string, options: UpdateOptions): Pr
         ...(current.schema ?? {}),
         ...parsedProperties,
       }
+      resolveRelationProperties(parsedProperties, mergedSchema, spaceId)
       await resolveRollupReferences(parsedProperties, mergedSchema, creds.token_v2)
       updateArgs.schema = mergedSchema
     }
