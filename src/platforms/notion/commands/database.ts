@@ -239,6 +239,124 @@ function getOptionValue(option: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
+function serializeRowProperties(
+  parsed: Record<string, unknown>,
+  schema: CollectionSchema,
+  nameToId: Record<string, string>,
+  registerOption: (propId: string, value: string) => void,
+): Record<string, unknown> {
+  const properties: Record<string, unknown> = {}
+
+  for (const [name, value] of Object.entries(parsed)) {
+    const propId = nameToId[name]
+    if (!propId) {
+      throw new Error(
+        `Unknown property: "${name}". Available: ${Object.values(schema)
+          .map((p) => p.name)
+          .join(', ')}`,
+      )
+    }
+
+    const propType = schema[propId].type
+    if (propType === 'auto_increment_id' || propType === 'formula' || propType === 'rollup') {
+      continue
+    }
+
+    if (propType === 'title') {
+      properties.title = [[value as string]]
+    } else if (propType === 'select' || propType === 'status') {
+      const selectValue = value as string
+      properties[propId] = [[selectValue]]
+      if (propType === 'select') {
+        registerOption(propId, selectValue)
+      }
+    } else if (propType === 'multi_select') {
+      const values = value as string[]
+      const segments: string[] = []
+      for (let i = 0; i < values.length; i++) {
+        if (i > 0) segments.push(',')
+        segments.push(values[i])
+        registerOption(propId, values[i])
+      }
+      properties[propId] = [segments]
+    } else if (propType === 'number') {
+      properties[propId] = [[String(value)]]
+    } else if (propType === 'checkbox') {
+      properties[propId] = [[value ? 'Yes' : 'No']]
+    } else if (propType === 'date') {
+      const dateValue = value as { start: string; end?: string }
+      const dateArgs: Record<string, string> = {
+        type: 'date',
+        start_date: dateValue.start,
+      }
+      if (dateValue.end) {
+        dateArgs.end_date = dateValue.end
+      }
+      properties[propId] = [['‣', [['d', dateArgs]]]]
+    } else if (propType === 'url' || propType === 'email' || propType === 'phone_number') {
+      properties[propId] = [[value as string]]
+    } else if (propType === 'text') {
+      properties[propId] = [[value as string]]
+    } else if (propType === 'person') {
+      const userIds = value as string[]
+      const segments: unknown[] = []
+      for (let i = 0; i < userIds.length; i++) {
+        if (i > 0) {
+          segments.push([','])
+        }
+        segments.push(['‣', [['u', userIds[i]]]])
+      }
+      properties[propId] = segments
+    } else if (propType === 'relation') {
+      const pageIds = value as string[]
+      const segments: unknown[] = []
+      for (let i = 0; i < pageIds.length; i++) {
+        if (i > 0) {
+          segments.push([','])
+        }
+        segments.push(['‣', [['p', formatNotionId(pageIds[i])]]])
+      }
+      properties[propId] = segments
+    } else {
+      properties[propId] = [[value as string]]
+    }
+  }
+
+  return properties
+}
+
+function buildSchemaOptionUpdates(
+  optionValuesToRegister: Record<string, string[]>,
+  schema: CollectionSchema,
+  collectionId: string,
+  spaceId: string,
+): Array<{
+  pointer: { table: 'collection'; id: string; spaceId: string }
+  command: 'update'
+  path: string[]
+  args: CollectionProperty & { options: unknown[] }
+}> {
+  return Object.entries(optionValuesToRegister).map(([propId, values]) => {
+    const schemaEntry = schema[propId]
+    const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
+    const newOptions: CollectionOption[] = values.map((value, index) => ({
+      id: generateOptionId(),
+      color: OPTION_COLORS[(existingOptions.length + index) % OPTION_COLORS.length],
+      value,
+    }))
+
+    return {
+      pointer: { table: 'collection' as const, id: collectionId, spaceId },
+      command: 'update' as const,
+      path: ['schema', propId],
+      args: {
+        ...schemaEntry,
+        options: [...existingOptions, ...newOptions],
+      },
+    }
+  })
+}
+
 function getRecordValue(record: Record<string, unknown>): Record<string, unknown> | undefined {
   const outer = record.value as Record<string, unknown> | undefined
   if (!outer) return undefined
@@ -614,6 +732,11 @@ async function addRowAction(rawCollectionId: string, options: AddRowOptions): Pr
     const spaceId = await resolveSpaceId(creds.token_v2, parentBlockId)
 
     const schema = collection.schema ?? {}
+    const nameToId: Record<string, string> = {}
+    for (const [propId, prop] of Object.entries(schema)) {
+      nameToId[prop.name] = propId
+    }
+
     const optionValuesToRegister: Record<string, string[]> = {}
 
     const registerSchemaOptionValue = (propId: string, value: string) => {
@@ -634,105 +757,13 @@ async function addRowAction(rawCollectionId: string, options: AddRowOptions): Pr
     const properties: Record<string, unknown> = { title: [[options.title]] }
 
     if (options.properties) {
-      const nameToId: Record<string, string> = {}
-      for (const [propId, prop] of Object.entries(schema)) {
-        nameToId[prop.name] = propId
-      }
-
       const parsed = JSON.parse(options.properties) as Record<string, unknown>
-      for (const [name, value] of Object.entries(parsed)) {
-        const propId = nameToId[name]
-        if (!propId) {
-          throw new Error(
-            `Unknown property: "${name}". Available: ${Object.values(schema)
-              .map((p) => p.name)
-              .join(', ')}`,
-          )
-        }
-        const propType = schema[propId].type
-        if (propType === 'auto_increment_id') {
-        } else if (propType === 'title') {
-          properties.title = [[value as string]]
-        } else if (propType === 'select' || propType === 'status') {
-          const selectValue = value as string
-          properties[propId] = [[selectValue]]
-          if (propType === 'select') {
-            registerSchemaOptionValue(propId, selectValue)
-          }
-        } else if (propType === 'multi_select') {
-          const values = value as string[]
-          const segments: string[] = []
-          for (let i = 0; i < values.length; i++) {
-            if (i > 0) segments.push(',')
-            segments.push(values[i])
-            registerSchemaOptionValue(propId, values[i])
-          }
-          properties[propId] = [segments]
-        } else if (propType === 'number') {
-          properties[propId] = [[String(value)]]
-        } else if (propType === 'checkbox') {
-          properties[propId] = [[value ? 'Yes' : 'No']]
-        } else if (propType === 'date') {
-          const dateValue = value as { start: string; end?: string }
-          const dateArgs: Record<string, string> = {
-            type: 'date',
-            start_date: dateValue.start,
-          }
-          if (dateValue.end) {
-            dateArgs.end_date = dateValue.end
-          }
-          properties[propId] = [['‣', [['d', dateArgs]]]]
-        } else if (propType === 'url' || propType === 'email' || propType === 'phone_number') {
-          properties[propId] = [[value as string]]
-        } else if (propType === 'text') {
-          properties[propId] = [[value as string]]
-        } else if (propType === 'person') {
-          const userIds = value as string[]
-          const segments: unknown[] = []
-          for (let i = 0; i < userIds.length; i++) {
-            if (i > 0) {
-              segments.push([','])
-            }
-            segments.push(['‣', [['u', userIds[i]]]])
-          }
-          properties[propId] = segments
-        } else if (propType === 'relation') {
-          const pageIds = value as string[]
-          const segments: unknown[] = []
-          for (let i = 0; i < pageIds.length; i++) {
-            if (i > 0) {
-              segments.push([','])
-            }
-            segments.push(['‣', [['p', formatNotionId(pageIds[i])]]])
-          }
-          properties[propId] = segments
-        } else {
-          properties[propId] = [[value as string]]
-        }
-      }
+      Object.assign(properties, serializeRowProperties(parsed, schema, nameToId, registerSchemaOptionValue))
     }
 
     const viewId = await resolveCollectionViewId(creds.token_v2, collectionId)
 
-    const schemaUpdateOperations = Object.entries(optionValuesToRegister).map(([propId, values]) => {
-      const schemaEntry = schema[propId]
-      const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
-      const newOptions: CollectionOption[] = values.map((value, index) => ({
-        id: generateOptionId(),
-        color: OPTION_COLORS[(existingOptions.length + index) % OPTION_COLORS.length],
-        value,
-      }))
-
-      return {
-        pointer: { table: 'collection' as const, id: collectionId, spaceId },
-        command: 'update' as const,
-        path: ['schema', propId],
-        args: {
-          ...schemaEntry,
-          options: [...existingOptions, ...newOptions],
-        },
-      }
-    })
+    const schemaUpdateOperations = buildSchemaOptionUpdates(optionValuesToRegister, schema, collectionId, spaceId)
 
     const operations = [
       ...schemaUpdateOperations,
