@@ -286,8 +286,6 @@ export function simplifyCollectionSchema(
         if (targetProperty) prop.target_property = targetProperty
         const targetPropertyType = toOptionalString(entry.target_property_type)
         if (targetPropertyType) prop.target_property_type = targetPropertyType
-        const aggregation = toOptionalString(entry.aggregation)
-        if (aggregation) prop.aggregation = aggregation
         break
       }
       case 'auto_increment_id': {
@@ -396,6 +394,13 @@ export function validateCollectionSchema(rawSchema: Record<string, Record<string
         hints.push(
           `Rollup '${name}' is missing rollup_type. ` +
             `This may crash the Notion app. ` +
+            `Fix: run \`database delete-property --property "${name}"\` and recreate the rollup.`,
+        )
+      }
+
+      if (toOptionalString(entry.aggregation)) {
+        hints.push(
+          `Rollup '${name}' has an aggregation field which crashes the Notion app. ` +
             `Fix: run \`database delete-property --property "${name}"\` and recreate the rollup.`,
         )
       }
