@@ -1626,6 +1626,687 @@ describe('database add-row', () => {
   })
 })
 
+describe('database update-row', () => {
+  test('update-row calls saveTransactions with per-property set operations', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select', options: [] },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+    const mockUpdatedRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              properties: {
+                prop1: [['Active']],
+              },
+            },
+          },
+        },
+      },
+    }
+
+    let blockFetchCount = 0
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string; id: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+
+        blockFetchCount += 1
+        return Promise.resolve(blockFetchCount === 1 ? mockRowResponse : mockUpdatedRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"Status":"Active"}'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) {
+      throw new Error('Expected saveTransactions call')
+    }
+
+    const operations = saveCall[2].transactions[0].operations
+    expect(operations[0]).toMatchObject({
+      command: 'update',
+      path: ['schema', 'prop1'],
+    })
+    expect(operations[1]).toMatchObject({
+      pointer: { table: 'block', id: 'row-1', spaceId: 'space-1' },
+      command: 'set',
+      path: ['properties', 'prop1'],
+      args: [['Active']],
+    })
+    expect(output.length).toBeGreaterThan(0)
+  })
+
+  test('update-row with relation property uses decorator format', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                rel1: { name: 'Related', type: 'relation' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"Related":["page-abc"]}'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) {
+      throw new Error('Expected saveTransactions call')
+    }
+
+    const operations = saveCall[2].transactions[0].operations
+    const relationSet = operations.find(
+      (op) => Array.isArray(op.path) && op.path[0] === 'properties' && op.path[1] === 'rel1',
+    )
+    expect(relationSet).toMatchObject({
+      command: 'set',
+      args: [['‣', [['p', 'page-abc']]]],
+    })
+    expect(output.length).toBeGreaterThan(0)
+  })
+
+  test('update-row with select new option registers schema update before property set', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select', options: [] },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"Status":"In Progress"}'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) {
+      throw new Error('Expected saveTransactions call')
+    }
+
+    const operations = saveCall[2].transactions[0].operations
+    const schemaIndex = operations.findIndex(
+      (op) => Array.isArray(op.path) && op.command === 'update' && op.path[0] === 'schema',
+    )
+    const setIndex = operations.findIndex(
+      (op) => Array.isArray(op.path) && op.command === 'set' && op.path[0] === 'properties' && op.path[1] === 'prop1',
+    )
+    expect(schemaIndex).toBeGreaterThanOrEqual(0)
+    expect(setIndex).toBeGreaterThanOrEqual(0)
+    expect(schemaIndex).toBeLessThan(setIndex)
+    expect(output.length).toBeGreaterThan(0)
+  })
+
+  test('update-row with multiple property types serializes all correctly', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                text1: { name: 'Notes', type: 'text' },
+                num1: { name: 'Count', type: 'number' },
+                check1: { name: 'Done', type: 'checkbox' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        [
+          'update-row',
+          'row-1',
+          '--workspace-id',
+          'space-1',
+          '--properties',
+          '{"Notes":"hello","Count":42,"Done":true}',
+        ],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) {
+      throw new Error('Expected saveTransactions call')
+    }
+
+    const operations = saveCall[2].transactions[0].operations
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: ['properties', 'text1'], args: [['hello']] }),
+        expect.objectContaining({ path: ['properties', 'num1'], args: [['42']] }),
+        expect.objectContaining({ path: ['properties', 'check1'], args: [['Yes']] }),
+      ]),
+    )
+    expect(output.length).toBeGreaterThan(0)
+  })
+
+  test('update-row throws on unknown property name', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const originalExit = process.exit
+    process.exit = mockExit as any
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const errors: string[] = []
+    const originalLog = console.log
+    const originalError = console.error
+    console.log = (msg: string) => output.push(msg)
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"NonExistent":"value"}'],
+        { from: 'user' },
+      )
+    } catch {
+      // expected
+    } finally {
+      console.log = originalLog
+      console.error = originalError
+      process.exit = originalExit
+    }
+
+    // Then
+    expect(output).toEqual([])
+    expect(errors.length).toBeGreaterThan(0)
+    const parsedError = JSON.parse(errors[0]) as { error: string }
+    expect(parsedError.error).toContain('Unknown property: "NonExistent"')
+    expect(parsedError.error).toContain('Available: Name')
+  })
+
+  test('update-row throws when block is not a database row', async () => {
+    mock.restore()
+    // Given
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'block',
+              parent_id: 'block-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string) => {
+      if (endpoint === 'syncRecordValues') {
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const originalExit = process.exit
+    process.exit = mockExit as any
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const errors: string[] = []
+    const originalLog = console.log
+    const originalError = console.error
+    console.log = (msg: string) => output.push(msg)
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"Name":"Task"}'],
+        { from: 'user' },
+      )
+    } catch {
+      // expected
+    } finally {
+      console.log = originalLog
+      console.error = originalError
+      process.exit = originalExit
+    }
+
+    // Then
+    expect(output).toEqual([])
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0]).toContain('is not a database row')
+  })
+
+  test('update-row throws when properties is empty object', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+    const mockExit = mock(() => {
+      throw new Error('process.exit called')
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const originalExit = process.exit
+    process.exit = mockExit as any
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const errors: string[] = []
+    const originalLog = console.log
+    const originalError = console.error
+    console.log = (msg: string) => output.push(msg)
+    console.error = (msg: string) => errors.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{}'], {
+        from: 'user',
+      })
+    } catch {
+      // expected
+    } finally {
+      console.log = originalLog
+      console.error = originalError
+      process.exit = originalExit
+    }
+
+    // Then
+    expect(output).toEqual([])
+    expect(errors.length).toBeGreaterThan(0)
+    expect(errors[0]).toContain('No properties to update')
+  })
+})
+
 describe('database delete-property', () => {
   test('removes property key from schema', async () => {
     mock.restore()

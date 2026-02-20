@@ -139,6 +139,10 @@ type AddRowOptions = WorkspaceOptions & {
   properties?: string
 }
 
+type UpdateRowOptions = WorkspaceOptions & {
+  properties: string
+}
+
 type DeletePropertyOptions = WorkspaceOptions & {
   property: string
 }
@@ -807,6 +811,94 @@ async function addRowAction(rawCollectionId: string, options: AddRowOptions): Pr
   }
 }
 
+async function updateRowAction(rawRowId: string, options: UpdateRowOptions): Promise<void> {
+  const rowId = formatNotionId(rawRowId)
+  try {
+    const creds = await getCredentialsOrExit()
+    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
+
+    const rowResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
+      requests: [{ pointer: { table: 'block', id: rowId }, version: -1 }],
+    })) as SyncRecordValuesResponse
+
+    const rowRecord = rowResponse.recordMap?.block?.[rowId] ?? Object.values(rowResponse.recordMap?.block ?? {})[0]
+    const blockValue = rowRecord?.value as
+      | {
+          parent_table?: string
+          parent_id?: string
+          space_id?: string
+        }
+      | undefined
+
+    if (blockValue?.parent_table !== 'collection') {
+      throw new Error(`Block ${rowId} is not a database row. Only database rows can be updated with update-row.`)
+    }
+
+    const collectionId = blockValue.parent_id as string | undefined
+    const spaceId = blockValue.space_id as string | undefined
+
+    if (!collectionId || !spaceId) {
+      throw new Error(`Could not resolve collection or space for row: ${rowId}`)
+    }
+
+    const collection = await fetchCollection(creds.token_v2, collectionId)
+    const schema = collection.schema ?? {}
+
+    const nameToId: Record<string, string> = {}
+    for (const [propId, prop] of Object.entries(schema)) {
+      nameToId[prop.name] = propId
+    }
+
+    const parsed = JSON.parse(options.properties) as Record<string, unknown>
+    if (Object.keys(parsed).length === 0) {
+      throw new Error('No properties to update. Provide --properties with at least one property name and value.')
+    }
+
+    const optionValuesToRegister: Record<string, string[]> = {}
+    const registerOption = (propId: string, value: string) => {
+      const schemaEntry = schema[propId]
+      const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
+      const existsInSchema = existingOptions.some((option) => getOptionValue(option) === value)
+      if (existsInSchema) {
+        return
+      }
+
+      const pendingValues = optionValuesToRegister[propId] ?? []
+      if (!pendingValues.includes(value)) {
+        optionValuesToRegister[propId] = [...pendingValues, value]
+      }
+    }
+
+    const serializedProps = serializeRowProperties(parsed, schema, nameToId, registerOption)
+    const schemaOps = buildSchemaOptionUpdates(optionValuesToRegister, schema, collectionId, spaceId)
+
+    const operations = [
+      ...schemaOps,
+      ...Object.entries(serializedProps).map(([propId, value]) => ({
+        pointer: { table: 'block' as const, id: rowId, spaceId },
+        command: 'set' as const,
+        path: ['properties', propId],
+        args: value,
+      })),
+    ]
+
+    await internalRequest(creds.token_v2, 'saveTransactions', {
+      requestId: generateId(),
+      transactions: [{ id: generateId(), spaceId, operations }],
+    })
+
+    const updated = (await internalRequest(creds.token_v2, 'syncRecordValues', {
+      requests: [{ pointer: { table: 'block', id: rowId }, version: -1 }],
+    })) as { recordMap: { block: Record<string, Record<string, unknown>> } }
+
+    const updatedBlock = Object.values(updated.recordMap.block)[0]
+    console.log(formatOutput(formatBlockRecord(updatedBlock), options.pretty))
+  } catch (error) {
+    console.error(JSON.stringify({ error: (error as Error).message }))
+    process.exit(1)
+  }
+}
+
 type ViewRecord = {
   value: {
     id: string
@@ -1102,6 +1194,15 @@ export const databaseCommand = new Command('database')
       .option('--properties <json>', 'Row properties as JSON (use property names from schema)')
       .option('--pretty')
       .action(addRowAction),
+  )
+  .addCommand(
+    new Command('update-row')
+      .description('Update properties on an existing database row')
+      .argument('<row_id>', 'Row (page) ID to update')
+      .requiredOption('--workspace-id <id>', 'Workspace ID')
+      .requiredOption('--properties <json>', 'Properties to update as JSON (use property names)')
+      .option('--pretty')
+      .action(updateRowAction),
   )
   .addCommand(
     new Command('view-get')
