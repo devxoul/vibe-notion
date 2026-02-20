@@ -659,6 +659,39 @@ describe('validateCollectionSchema', () => {
     expect(hints.some((h) => h.includes('Bad Rollup') && h.includes('no target_property'))).toBe(true)
   })
 
+  test('detects rollup without rollup_type', () => {
+    const schema = {
+      title: { name: 'Name', type: 'title' },
+      rel: { name: 'Source Rel', type: 'relation', collection_id: 'coll-1' },
+      r1: {
+        name: 'Old Rollup',
+        type: 'rollup',
+        relation_property: 'rel',
+        target_property: 'title',
+        target_property_type: 'title',
+      },
+    }
+    const hints = validateCollectionSchema(schema)
+    expect(hints.some((h) => h.includes('Old Rollup') && h.includes('missing rollup_type'))).toBe(true)
+  })
+
+  test('does not hint when rollup has rollup_type', () => {
+    const schema = {
+      title: { name: 'Name', type: 'title' },
+      rel: { name: 'Source Rel', type: 'relation', collection_id: 'coll-1' },
+      r1: {
+        name: 'Good Rollup',
+        type: 'rollup',
+        relation_property: 'rel',
+        target_property: 'title',
+        target_property_type: 'title',
+        rollup_type: 'relation',
+      },
+    }
+    const hints = validateCollectionSchema(schema)
+    expect(hints.some((h) => h.includes('Good Rollup') && h.includes('missing rollup_type'))).toBe(false)
+  })
+
   test('detects relation without collection_id', () => {
     const schema = {
       title: { name: 'Name', type: 'title' },

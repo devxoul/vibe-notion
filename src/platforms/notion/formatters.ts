@@ -328,6 +328,14 @@ export function validateCollectionSchema(rawSchema: Record<string, Record<string
             `Fix: run \`database delete-property --property "${name}"\` to remove it.`,
         )
       }
+
+      if (!toOptionalString(entry.rollup_type)) {
+        hints.push(
+          `Rollup '${name}' is missing rollup_type. ` +
+            `This may crash the Notion app. ` +
+            `Fix: run \`database delete-property --property "${name}"\` and recreate the rollup.`,
+        )
+      }
     }
 
     if (type === 'relation') {
