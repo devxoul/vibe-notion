@@ -73,7 +73,7 @@ describe('database commands', () => {
       const output = JSON.parse(consoleOutput[0])
       expect(output.id).toBe('db-123')
       expect(output.title).toBe('My Database')
-      expect(output.properties.Name).toBe('title')
+      expect(output.properties.Name).toEqual({ type: 'title' })
     })
 
     test('handles error on retrieve failure', async () => {

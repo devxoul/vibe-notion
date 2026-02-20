@@ -315,12 +315,79 @@ export function formatPage(page: Record<string, unknown>): {
   }
 }
 
-export function simplifyDatabaseProperties(properties: Record<string, unknown>): Record<string, string> {
-  const simplified: Record<string, string> = {}
+export type SimplifiedSchemaProperty = { type: string } & Record<string, unknown>
+
+export function simplifyDatabaseProperties(
+  properties: Record<string, unknown>,
+): Record<string, SimplifiedSchemaProperty> {
+  const simplified: Record<string, SimplifiedSchemaProperty> = {}
 
   for (const [name, value] of Object.entries(properties)) {
     const property = toRecord(value)
-    simplified[name] = toStringOrEmpty(property?.type)
+    const type = toStringOrEmpty(property?.type)
+    if (!type) continue
+
+    const prop: SimplifiedSchemaProperty = { type }
+
+    switch (type) {
+      case 'select':
+      case 'multi_select': {
+        const typeData = toRecord(property?.[type])
+        if (typeData && Array.isArray(typeData.options) && typeData.options.length > 0) {
+          const values = typeData.options
+            .map((opt: unknown) => {
+              const o = opt as Record<string, unknown>
+              return typeof o.name === 'string' ? o.name : undefined
+            })
+            .filter(Boolean) as string[]
+          if (values.length > 0) prop.options = values
+        }
+        break
+      }
+      case 'status': {
+        const statusData = toRecord(property?.status)
+        if (statusData && Array.isArray(statusData.options) && statusData.options.length > 0) {
+          const values = statusData.options
+            .map((opt: unknown) => {
+              const o = opt as Record<string, unknown>
+              return typeof o.name === 'string' ? o.name : undefined
+            })
+            .filter(Boolean) as string[]
+          if (values.length > 0) prop.options = values
+        }
+        break
+      }
+      case 'relation': {
+        const relationData = toRecord(property?.relation)
+        if (relationData) {
+          const databaseId = toStringOrEmpty(relationData.database_id)
+          if (databaseId) prop.database_id = databaseId
+        }
+        break
+      }
+      case 'rollup': {
+        const rollupData = toRecord(property?.rollup)
+        if (rollupData) {
+          const relPropName = toStringOrEmpty(rollupData.relation_property_name)
+          if (relPropName) prop.relation_property_name = relPropName
+          const rollupPropName = toStringOrEmpty(rollupData.rollup_property_name)
+          if (rollupPropName) prop.rollup_property_name = rollupPropName
+          const fn = toStringOrEmpty(rollupData.function)
+          if (fn) prop.function = fn
+        }
+        break
+      }
+      case 'formula': {
+        const formulaData = toRecord(property?.formula)
+        if (formulaData) {
+          const expression = toStringOrEmpty(formulaData.expression)
+          if (expression) prop.expression = expression
+        }
+        break
+      }
+    }
+
+    simplified[name] = prop
   }
 
   return simplified
@@ -330,7 +397,7 @@ export function formatDatabase(db: Record<string, unknown>): {
   id: string
   title: string
   url: string
-  properties: Record<string, string>
+  properties: Record<string, SimplifiedSchemaProperty>
   parent: unknown
   last_edited_time: string
 } {

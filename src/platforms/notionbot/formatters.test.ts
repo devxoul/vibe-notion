@@ -584,9 +584,9 @@ describe('simplifyDatabaseProperties', () => {
 
     // Then
     expect(result).toEqual({
-      Name: 'title',
-      Status: 'select',
-      Due: 'date',
+      Name: { type: 'title' },
+      Status: { type: 'select' },
+      Due: { type: 'date' },
     })
   })
 })
@@ -615,8 +615,8 @@ describe('formatDatabase', () => {
       title: 'Project Tasks',
       url: 'https://notion.so/db-123',
       properties: {
-        Name: 'title',
-        Done: 'checkbox',
+        Name: { type: 'title' },
+        Done: { type: 'checkbox' },
       },
       parent: { type: 'page_id', page_id: 'page-root' },
       last_edited_time: '2024-01-08T08:00:00.000Z',
