@@ -163,6 +163,65 @@ function parseSchemaProperties(raw?: string): CollectionSchema {
   return parsed as CollectionSchema
 }
 
+function buildNameToKey(schema: CollectionSchema): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const [key, prop] of Object.entries(schema)) {
+    if (prop.alive === false) continue
+    if (prop.name) map[prop.name] = key
+  }
+  return map
+}
+
+async function resolveRollupReferences(
+  properties: CollectionSchema,
+  mergedSchema: CollectionSchema,
+  tokenV2: string,
+): Promise<void> {
+  for (const [, prop] of Object.entries(properties)) {
+    if (prop.type !== 'rollup') continue
+
+    const relationRef = prop.relation_property as string | undefined
+    if (!relationRef) continue
+
+    let relationKey = relationRef
+    if (!mergedSchema[relationKey]) {
+      const nameToKey = buildNameToKey(mergedSchema)
+      if (nameToKey[relationRef]) {
+        relationKey = nameToKey[relationRef]
+        prop.relation_property = relationKey
+      }
+    }
+
+    const targetRef = prop.target_property as string | undefined
+    if (!targetRef) continue
+
+    const relationProp = mergedSchema[relationKey]
+    if (!relationProp || relationProp.type !== 'relation') continue
+
+    const collectionId = relationProp.collection_id as string | undefined
+    if (!collectionId) continue
+
+    const targetCollection = await fetchCollection(tokenV2, collectionId)
+    const targetSchema = targetCollection.schema ?? {}
+
+    if (targetSchema[targetRef]) {
+      if (!prop.target_property_type) {
+        prop.target_property_type = targetSchema[targetRef].type
+      }
+      continue
+    }
+
+    const targetNameToKey = buildNameToKey(targetSchema)
+    const resolvedKey = targetNameToKey[targetRef]
+    if (resolvedKey) {
+      prop.target_property = resolvedKey
+      if (!prop.target_property_type) {
+        prop.target_property_type = targetSchema[resolvedKey].type
+      }
+    }
+  }
+}
+
 function generateOptionId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   let result = ''
@@ -341,6 +400,11 @@ async function createAction(options: CreateOptions): Promise<void> {
     const viewId = generateId()
     const blockId = generateId()
     const parsedProperties = parseSchemaProperties(options.properties)
+    const mergedSchema: CollectionSchema = {
+      title: { name: 'Name', type: 'title' },
+      ...parsedProperties,
+    }
+    await resolveRollupReferences(parsedProperties, mergedSchema, creds.token_v2)
 
     await internalRequest(creds.token_v2, 'saveTransactions', {
       requestId: generateId(),
@@ -356,10 +420,7 @@ async function createAction(options: CreateOptions): Promise<void> {
               args: {
                 id: collId,
                 name: [[options.title]],
-                schema: {
-                  title: { name: 'Name', type: 'title' },
-                  ...parsedProperties,
-                },
+                schema: mergedSchema,
                 parent_id: blockId,
                 parent_table: 'block',
                 alive: true,
@@ -444,10 +505,12 @@ async function updateAction(rawCollectionId: string, options: UpdateOptions): Pr
 
     if (options.properties) {
       const parsedProperties = parseSchemaProperties(options.properties)
-      updateArgs.schema = {
+      const mergedSchema: CollectionSchema = {
         ...(current.schema ?? {}),
         ...parsedProperties,
       }
+      await resolveRollupReferences(parsedProperties, mergedSchema, creds.token_v2)
+      updateArgs.schema = mergedSchema
     }
 
     await internalRequest(creds.token_v2, 'saveTransactions', {

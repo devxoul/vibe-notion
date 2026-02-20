@@ -542,6 +542,172 @@ describe('Notion E2E Tests', () => {
 
       await waitForRateLimit()
     }, 60000)
+
+    test('database create resolves rollup property names to internal keys', async () => {
+      // given — source DB with a text property
+      const testId = generateTestId()
+      const srcResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        `e2e-rollup-name-src-${testId}`,
+        '--properties',
+        '{"src_id":{"name":"Source ID","type":"text"}}',
+      ])
+      expect(srcResult.exitCode).toBe(0)
+
+      const srcDb = parseJSON<{ id: string }>(srcResult.stdout)
+      expect(srcDb?.id).toBeTruthy()
+      const srcDbId = srcDb!.id
+      testDatabaseIds.push(srcDbId)
+
+      await waitForRateLimit()
+
+      // when — create target DB with rollup using property NAMES (not internal keys)
+      const tgtResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        `e2e-rollup-name-tgt-${testId}`,
+        '--properties',
+        JSON.stringify({
+          rel: { name: 'Source Rel', type: 'relation', collection_id: srcDbId },
+          my_rollup: {
+            name: 'My Rollup',
+            type: 'rollup',
+            relation_property: 'Source Rel',
+            target_property: 'Source ID',
+          },
+        }),
+      ])
+      expect(tgtResult.exitCode).toBe(0)
+
+      const tgtDb = parseJSON<{ id: string; schema: Record<string, string> }>(tgtResult.stdout)
+      expect(tgtDb?.id).toBeTruthy()
+      expect(tgtDb?.schema?.['My Rollup']).toBe('rollup')
+      expect(tgtDb?.schema?.['Source Rel']).toBe('relation')
+      const tgtDbId = tgtDb!.id
+      testDatabaseIds.push(tgtDbId)
+
+      await waitForRateLimit()
+
+      // then — database get should have no broken-rollup hints
+      const getResult = await runNotionCLI([
+        'database',
+        'get',
+        '--workspace-id',
+        workspaceId,
+        tgtDbId,
+      ])
+      expect(getResult.exitCode).toBe(0)
+
+      const getDb = parseJSON<{ id: string; schema: Record<string, string>; $hints?: string[] }>(getResult.stdout)
+      expect(getDb?.schema?.['My Rollup']).toBe('rollup')
+
+      const rollupHints = (getDb?.$hints ?? []).filter((h) => h.includes('My Rollup'))
+      expect(rollupHints).toEqual([])
+
+      await waitForRateLimit()
+    }, 60000)
+
+    test('database update resolves rollup property names to internal keys', async () => {
+      // given — source DB with a text property
+      const testId = generateTestId()
+      const srcResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        `e2e-rollup-upd-src-${testId}`,
+        '--properties',
+        '{"src_id":{"name":"Source ID","type":"text"}}',
+      ])
+      expect(srcResult.exitCode).toBe(0)
+
+      const srcDb = parseJSON<{ id: string }>(srcResult.stdout)
+      expect(srcDb?.id).toBeTruthy()
+      const srcDbId = srcDb!.id
+      testDatabaseIds.push(srcDbId)
+
+      await waitForRateLimit()
+
+      // given — target DB with only a relation
+      const tgtResult = await runNotionCLI([
+        'database',
+        'create',
+        '--workspace-id',
+        workspaceId,
+        '--parent',
+        containerId,
+        '--title',
+        `e2e-rollup-upd-tgt-${testId}`,
+        '--properties',
+        JSON.stringify({
+          rel: { name: 'Source Rel', type: 'relation', collection_id: srcDbId },
+        }),
+      ])
+      expect(tgtResult.exitCode).toBe(0)
+
+      const tgtDb = parseJSON<{ id: string }>(tgtResult.stdout)
+      expect(tgtDb?.id).toBeTruthy()
+      const tgtDbId = tgtDb!.id
+      testDatabaseIds.push(tgtDbId)
+
+      await waitForRateLimit()
+
+      // when — update to add rollup using property NAMES
+      const updateResult = await runNotionCLI([
+        'database',
+        'update',
+        '--workspace-id',
+        workspaceId,
+        tgtDbId,
+        '--properties',
+        JSON.stringify({
+          my_rollup: {
+            name: 'My Rollup',
+            type: 'rollup',
+            relation_property: 'Source Rel',
+            target_property: 'Source ID',
+          },
+        }),
+      ])
+      expect(updateResult.exitCode).toBe(0)
+
+      const updatedDb = parseJSON<{ id: string; schema: Record<string, string> }>(updateResult.stdout)
+      expect(updatedDb?.schema?.['My Rollup']).toBe('rollup')
+
+      await waitForRateLimit()
+
+      // then — database get should have no broken-rollup hints
+      const getResult = await runNotionCLI([
+        'database',
+        'get',
+        '--workspace-id',
+        workspaceId,
+        tgtDbId,
+      ])
+      expect(getResult.exitCode).toBe(0)
+
+      const getDb = parseJSON<{ id: string; schema: Record<string, string>; $hints?: string[] }>(getResult.stdout)
+      expect(getDb?.schema?.['My Rollup']).toBe('rollup')
+
+      const rollupHints = (getDb?.$hints ?? []).filter((h) => h.includes('My Rollup'))
+      expect(rollupHints).toEqual([])
+
+      await waitForRateLimit()
+    }, 60000)
   })
 
   // ── block ─────────────────────────────────────────────────────────────
