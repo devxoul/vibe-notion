@@ -13,42 +13,28 @@ A TypeScript CLI tool that enables AI agents and humans to interact with Notion 
 ## Quick Start
 
 ```bash
-# 1. Extract token_v2 from Notion desktop app
-vibe-notion auth extract
-
-# 2. Find your workspace ID
+# 1. Find your workspace ID
 vibe-notion workspace list --pretty
 
-# 3. Search for a page
+# 2. Search for a page
 vibe-notion search "Roadmap" --workspace-id <workspace-id> --pretty
 
-# 4. Get page content
+# 3. Get page content
 vibe-notion page get <page-id> --workspace-id <workspace-id> --pretty
 
-# 5. Query a database
+# 4. Query a database
 vibe-notion database query <collection-id> --workspace-id <workspace-id> --pretty
 ```
+
+Credentials are auto-extracted from the Notion desktop app on first use. No manual setup needed.
 
 > **Important**: `--workspace-id` is required for ALL commands that operate within a specific workspace. Use `vibe-notion workspace list` to find your workspace ID.
 
 ## Authentication
 
-### Token Extraction (Desktop App)
+Credentials (`token_v2`) are auto-extracted from the Notion desktop app when you run any command. No API keys, OAuth, or manual extraction needed.
 
-Extract `token_v2` from the Notion desktop app automatically. No API keys or OAuth needed.
-
-```bash
-# Extract token_v2 from Notion desktop app
-vibe-notion auth extract
-
-# Check auth status (shows extracted token_v2)
-vibe-notion auth status
-
-# Remove stored token_v2
-vibe-notion auth logout
-```
-
-On macOS, your system may prompt for Keychain access — this is normal and required to decrypt the cookie.
+On macOS, your system may prompt for Keychain access on first use — this is normal and required to decrypt the cookie.
 
 The extracted `token_v2` is stored at `~/.config/vibe-notion/credentials.json` with `0600` permissions.
 
@@ -131,9 +117,9 @@ Here's a concrete example of how to structure your `MEMORY.md`:
 ### Auth Commands
 
 ```bash
-vibe-notion auth extract    # Extract token_v2 from Notion desktop app
 vibe-notion auth status     # Check authentication status
 vibe-notion auth logout     # Remove stored token_v2
+vibe-notion auth extract    # Manually re-extract token_v2 (for troubleshooting)
 ```
 
 ### Page Commands
@@ -500,6 +486,16 @@ Commands that return lists support pagination via `has_more`, `next_cursor` fiel
 
 ## Troubleshooting
 
+### Authentication failures
+
+If auto-extraction fails (e.g., Notion desktop app is not installed or not logged in), run the extract command manually for debug output:
+
+```bash
+vibe-notion auth extract --debug
+```
+
+This shows the Notion directory path and extraction steps to help diagnose the issue.
+
 ### `vibe-notion: command not found`
 
 The `vibe-notion` package is not installed. Run it directly using a package runner. Ask the user which one to use:
@@ -514,6 +510,6 @@ If you already know the user's preferred package runner, use it directly instead
 
 ## Limitations
 
-- `auth extract` supports macOS and Linux. Windows DPAPI decryption is not yet supported.
+- Auto-extraction supports macOS and Linux. Windows DPAPI decryption is not yet supported.
 - `token_v2` uses the unofficial internal API and may break if Notion changes it.
 - This is a private/unofficial API and is not supported by Notion.
