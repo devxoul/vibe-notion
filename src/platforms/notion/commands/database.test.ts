@@ -1708,18 +1708,16 @@ describe('database delete-property', () => {
       console.log = originalLog
     }
 
-    // Then — saveTransactions replaces full schema without the deleted property
+    // Then — saveTransactions renames and soft-deletes the property to avoid name collisions
     const saveCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
     const operation = (saveCall?.[2] as any).transactions[0].operations[0]
     expect(operation.command).toBe('update')
-    expect(operation.path).toEqual(['schema'])
-    expect(operation.args).toEqual({
-      title: { name: 'Name', type: 'title' },
-      prop2: { name: 'Priority', type: 'select' },
-    })
+    expect(operation.path).toEqual(['schema', 'prop1'])
+    expect(operation.args.alive).toBe(false)
+    expect(operation.args.name).toMatch(/^__deleted_prop1_\d+$/)
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])
