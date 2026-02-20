@@ -1627,7 +1627,7 @@ describe('database add-row', () => {
 })
 
 describe('database delete-property', () => {
-  test('marks property as alive:false by name', async () => {
+  test('removes property key from schema', async () => {
     mock.restore()
     // Given
     const mockGetResponse = {
@@ -1659,7 +1659,6 @@ describe('database delete-property', () => {
               name: [['Test DB']],
               schema: {
                 title: { name: 'Name', type: 'title' },
-                prop1: { name: 'Status', type: 'select', alive: false },
                 prop2: { name: 'Priority', type: 'select' },
               },
               parent_id: 'block-1',
@@ -1709,15 +1708,18 @@ describe('database delete-property', () => {
       console.log = originalLog
     }
 
-    // Then — saveTransactions uses alive:false on the specific property path
+    // Then — saveTransactions replaces full schema without the deleted property
     const saveCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
     const operation = (saveCall?.[2] as any).transactions[0].operations[0]
     expect(operation.command).toBe('update')
-    expect(operation.path).toEqual(['schema', 'prop1'])
-    expect(operation.args).toEqual({ alive: false })
+    expect(operation.path).toEqual(['schema'])
+    expect(operation.args).toEqual({
+      title: { name: 'Name', type: 'title' },
+      prop2: { name: 'Priority', type: 'select' },
+    })
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])

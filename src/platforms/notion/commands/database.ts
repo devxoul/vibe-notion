@@ -511,6 +511,9 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
 
     const spaceId = await resolveSpaceId(creds.token_v2, parentId)
 
+    const newSchema = { ...schema }
+    delete newSchema[propId]
+
     await internalRequest(creds.token_v2, 'saveTransactions', {
       requestId: generateId(),
       transactions: [
@@ -521,8 +524,8 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
             {
               pointer: { table: 'collection', id: collectionId, spaceId },
               command: 'update',
-              path: ['schema', propId],
-              args: { alive: false },
+              path: ['schema'],
+              args: newSchema,
             },
           ],
         },
