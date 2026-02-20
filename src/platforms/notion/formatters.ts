@@ -226,8 +226,21 @@ export function formatBlockRecord(record: Record<string, unknown>): {
   }
 }
 
-export function simplifyCollectionSchema(schema: Record<string, Record<string, unknown>>): Record<string, string> {
-  const simplified: Record<string, string> = {}
+export type SimplifiedSchemaProperty = { type: string } & Record<string, unknown>
+
+export function simplifyCollectionSchema(
+  schema: Record<string, Record<string, unknown>>,
+): Record<string, SimplifiedSchemaProperty> {
+  const simplified: Record<string, SimplifiedSchemaProperty> = {}
+
+  // Build propId → name lookup for resolving rollup references
+  const propIdToName: Record<string, string> = {}
+  for (const [propId, entry] of Object.entries(schema)) {
+    const name = toOptionalString(entry.name)
+    if (name && entry.alive !== false) {
+      propIdToName[propId] = name
+    }
+  }
 
   for (const entry of Object.values(schema)) {
     if (entry.alive === false) continue
@@ -239,7 +252,52 @@ export function simplifyCollectionSchema(schema: Record<string, Record<string, u
       continue
     }
 
-    simplified[name] = type
+    const prop: SimplifiedSchemaProperty = { type }
+
+    switch (type) {
+      case 'select':
+      case 'multi_select':
+      case 'status': {
+        if (Array.isArray(entry.options) && entry.options.length > 0) {
+          const values = entry.options
+            .map((opt: unknown) => {
+              if (opt && typeof opt === 'object') {
+                const v = (opt as Record<string, unknown>).value
+                return typeof v === 'string' ? v : undefined
+              }
+              return undefined
+            })
+            .filter(Boolean) as string[]
+          if (values.length > 0) prop.options = values
+        }
+        break
+      }
+      case 'relation': {
+        const collectionId = toOptionalString(entry.collection_id)
+        if (collectionId) prop.collection_id = collectionId
+        break
+      }
+      case 'rollup': {
+        const relationProperty = toOptionalString(entry.relation_property)
+        if (relationProperty) {
+          prop.relation_property = propIdToName[relationProperty] ?? relationProperty
+        }
+        const targetProperty = toOptionalString(entry.target_property)
+        if (targetProperty) prop.target_property = targetProperty
+        const targetPropertyType = toOptionalString(entry.target_property_type)
+        if (targetPropertyType) prop.target_property_type = targetPropertyType
+        const aggregation = toOptionalString(entry.aggregation)
+        if (aggregation) prop.aggregation = aggregation
+        break
+      }
+      case 'auto_increment_id': {
+        const prefix = toOptionalString(entry.prefix)
+        if (prefix) prop.prefix = prefix
+        break
+      }
+    }
+
+    simplified[name] = prop
   }
 
   return simplified
@@ -263,12 +321,17 @@ export function extractCollectionName(name: unknown): string {
 export function formatCollectionValue(collection: Record<string, unknown>): {
   id: string
   name: string
-  schema: Record<string, string>
+  schema: Record<string, SimplifiedSchemaProperty>
   $hints?: string[]
 } {
   const rawSchema = toRecordMap(collection.schema)
   const hints = validateCollectionSchema(rawSchema)
-  const result: { id: string; name: string; schema: Record<string, string>; $hints?: string[] } = {
+  const result: {
+    id: string
+    name: string
+    schema: Record<string, SimplifiedSchemaProperty>
+    $hints?: string[]
+  } = {
     id: toStringValue(collection.id),
     name: extractCollectionName(collection.name),
     schema: simplifyCollectionSchema(rawSchema),

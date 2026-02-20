@@ -60,7 +60,7 @@ describe('database get', () => {
     expect(parsed).toEqual({
       id: 'coll-1',
       name: 'Test DB',
-      schema: { Name: 'title' },
+      schema: { Name: { type: 'title' } },
     })
   })
 
@@ -921,7 +921,7 @@ describe('database create', () => {
     expect(parsed).toEqual({
       id: 'mock-uuid',
       name: 'New DB',
-      schema: { Name: 'title' },
+      schema: { Name: { type: 'title' } },
     })
   })
 
@@ -1162,7 +1162,7 @@ describe('database update', () => {
     expect(parsed).toEqual({
       id: 'coll-1',
       name: 'New Title',
-      schema: { Name: 'title' },
+      schema: { Name: { type: 'title' } },
     })
   })
 
@@ -1324,7 +1324,7 @@ describe('database update', () => {
     expect(parsed).toEqual({
       id: 'coll-1',
       name: 'Test DB',
-      schema: { Name: 'title' },
+      schema: { Name: { type: 'title' } },
     })
   })
 })
@@ -2546,7 +2546,7 @@ describe('database delete-property', () => {
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])
-    expect(parsed.schema).toEqual({ Name: 'title', Priority: 'select' })
+    expect(parsed.schema).toEqual({ Name: { type: 'title' }, Priority: { type: 'select' } })
   })
 
   test('errors when property name not found', async () => {

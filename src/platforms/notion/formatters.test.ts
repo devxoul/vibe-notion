@@ -577,8 +577,8 @@ describe('simplifyCollectionSchema', () => {
 
     // Then
     expect(result).toEqual({
-      Name: 'title',
-      Status: 'select',
+      Name: { type: 'title' },
+      Status: { type: 'select' },
     })
   })
 
@@ -595,8 +595,8 @@ describe('simplifyCollectionSchema', () => {
 
     // Then
     expect(result).toEqual({
-      Name: 'title',
-      Status: 'select',
+      Name: { type: 'title' },
+      Status: { type: 'select' },
     })
   })
 })
@@ -758,8 +758,8 @@ describe('formatCollectionValue', () => {
       id: 'collection-1',
       name: 'My Database',
       schema: {
-        Name: 'title',
-        Status: 'select',
+        Name: { type: 'title' },
+        Status: { type: 'select', options: ['Open'] },
       },
     })
   })
@@ -779,7 +779,7 @@ describe('formatCollectionValue', () => {
     const result = formatCollectionValue(collection)
 
     // Then
-    expect(result.schema).toEqual({ Name: 'title' })
+    expect(result.schema).toEqual({ Name: { type: 'title' } })
     expect(result.$hints).toBeDefined()
     expect(result.$hints!.length).toBe(1)
     expect(result.$hints![0]).toContain('Old Prop')
