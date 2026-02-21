@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { Client as NotionSDK } from '@notionhq/client'
-import { getClient, NotionClient } from './client'
+import { getClient, getClientOrThrow, NotionClient } from './client'
 
 const mockBlocks = {
   retrieve: mock(() => Promise.resolve({})),
@@ -195,6 +195,43 @@ describe('getClient', () => {
     try {
       // When
       const client = getClient()
+
+      // Then
+      expect(client).toBeInstanceOf(NotionClient)
+    } finally {
+      // Restore
+      if (original !== undefined) {
+        process.env.NOTION_TOKEN = original
+      } else {
+        delete process.env.NOTION_TOKEN
+      }
+    }
+  })
+})
+
+describe('getClientOrThrow', () => {
+  test('throws error when NOTION_TOKEN env var is not set', () => {
+    // Given
+    const original = process.env.NOTION_TOKEN
+    delete process.env.NOTION_TOKEN
+
+    try {
+      // When/Then
+      expect(() => getClientOrThrow()).toThrow('NOTION_TOKEN environment variable is not set')
+    } finally {
+      // Restore
+      if (original !== undefined) process.env.NOTION_TOKEN = original
+    }
+  })
+
+  test('returns NotionClient when NOTION_TOKEN is set', () => {
+    // Given
+    const original = process.env.NOTION_TOKEN
+    process.env.NOTION_TOKEN = 'ntn_test_env_token'
+
+    try {
+      // When
+      const client = getClientOrThrow()
 
       // Then
       expect(client).toBeInstanceOf(NotionClient)
