@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { getClient } from '@/platforms/notionbot/client'
+import { getClient, type NotionClient } from '@/platforms/notionbot/client'
 import { formatDatabase, formatDatabaseListResults, formatDatabaseQueryResults } from '@/platforms/notionbot/formatters'
 import { handleError } from '@/shared/utils/error-handler'
 import { formatNotionId } from '@/shared/utils/id'
@@ -61,25 +61,14 @@ async function queryAction(
 async function createAction(
   options: PrettyOption & { parent: string; title: string; properties?: string },
 ): Promise<void> {
-  const parentId = formatNotionId(options.parent)
   try {
     const client = getClient()
-    const parsed = options.properties ? JSON.parse(options.properties) : {}
-    const hasTitleProperty = Object.values(parsed).some((v: any) => v && typeof v === 'object' && 'title' in v)
-    const properties = hasTitleProperty ? parsed : { Name: { title: {} }, ...parsed }
-
-    // Use client.request() directly because the SDK (v5+) strips `properties`
-    // from the body params of databases.create, causing the API to reject the request.
-    const result = await client.request({
-      path: 'databases',
-      method: 'post',
-      body: {
-        parent: { type: 'page_id', page_id: parentId },
-        title: [{ type: 'text', text: { content: options.title } }],
-        properties,
-      },
+    const result = await handleDatabaseCreate(client, {
+      parent: options.parent,
+      title: options.title,
+      properties: options.properties,
     })
-    console.log(formatOutput(formatDatabase(result as Record<string, unknown>), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
@@ -89,25 +78,14 @@ async function updateAction(
   rawDatabaseId: string,
   options: PrettyOption & { title?: string; properties?: string },
 ): Promise<void> {
-  const databaseId = formatNotionId(rawDatabaseId)
   try {
     const client = getClient()
-    const body: Record<string, unknown> = {}
-
-    if (options.title) {
-      body.title = [{ type: 'text', text: { content: options.title } }]
-    }
-    if (options.properties) {
-      body.properties = JSON.parse(options.properties)
-    }
-
-    // Use client.request() directly — same SDK workaround as createAction
-    const result = await client.request({
-      path: `databases/${databaseId}`,
-      method: 'patch',
-      body,
+    const result = await handleDatabaseUpdate(client, {
+      database_id: rawDatabaseId,
+      title: options.title,
+      properties: options.properties,
     })
-    console.log(formatOutput(formatDatabase(result as Record<string, unknown>), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
@@ -117,17 +95,13 @@ async function deletePropertyAction(
   rawDatabaseId: string,
   options: PrettyOption & { property: string },
 ): Promise<void> {
-  const databaseId = formatNotionId(rawDatabaseId)
   try {
     const client = getClient()
-    const result = await client.request({
-      path: `databases/${databaseId}`,
-      method: 'patch',
-      body: {
-        properties: { [options.property]: null },
-      },
+    const result = await handleDatabaseDeleteProperty(client, {
+      database_id: rawDatabaseId,
+      property: options.property,
     })
-    console.log(formatOutput(formatDatabase(result as Record<string, unknown>), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
@@ -152,6 +126,67 @@ async function listAction(options: PrettyOption & { pageSize?: string; startCurs
   } catch (error) {
     handleError(error as Error)
   }
+}
+
+export async function handleDatabaseCreate(
+  client: NotionClient,
+  args: { parent: string; title: string; properties?: string },
+): Promise<unknown> {
+  const parentId = formatNotionId(args.parent)
+  const parsed = args.properties ? JSON.parse(args.properties) : {}
+  const hasTitleProperty = Object.values(parsed).some((v: any) => v && typeof v === 'object' && 'title' in v)
+  const properties = hasTitleProperty ? parsed : { Name: { title: {} }, ...parsed }
+
+  // Use client.request() directly because the SDK (v5+) strips `properties`
+  // from the body params of databases.create, causing the API to reject the request.
+  const result = await client.request({
+    path: 'databases',
+    method: 'post',
+    body: {
+      parent: { type: 'page_id', page_id: parentId },
+      title: [{ type: 'text', text: { content: args.title } }],
+      properties,
+    },
+  })
+  return formatDatabase(result as Record<string, unknown>)
+}
+
+export async function handleDatabaseUpdate(
+  client: NotionClient,
+  args: { database_id: string; title?: string; properties?: string },
+): Promise<unknown> {
+  const databaseId = formatNotionId(args.database_id)
+  const body: Record<string, unknown> = {}
+
+  if (args.title) {
+    body.title = [{ type: 'text', text: { content: args.title } }]
+  }
+  if (args.properties) {
+    body.properties = JSON.parse(args.properties)
+  }
+
+  // Use client.request() directly — same SDK workaround as handleDatabaseCreate
+  const result = await client.request({
+    path: `databases/${databaseId}`,
+    method: 'patch',
+    body,
+  })
+  return formatDatabase(result as Record<string, unknown>)
+}
+
+export async function handleDatabaseDeleteProperty(
+  client: NotionClient,
+  args: { database_id: string; property: string },
+): Promise<unknown> {
+  const databaseId = formatNotionId(args.database_id)
+  const result = await client.request({
+    path: `databases/${databaseId}`,
+    method: 'patch',
+    body: {
+      properties: { [args.property]: null },
+    },
+  })
+  return formatDatabase(result as Record<string, unknown>)
 }
 
 export const databaseCommand = new Command('database')

@@ -230,75 +230,173 @@ function parsePageChunkCursor(rawCursor: string | undefined): { stack: unknown[]
   return { stack: cursor.stack }
 }
 
-async function appendAction(rawParentId: string, options: AppendOptions): Promise<void> {
-  const parentId = formatNotionId(rawParentId)
-  try {
-    const hasContent = options.content !== undefined
-    const hasMarkdown = options.markdown !== undefined || options.markdownFile !== undefined
+export async function handleBlockAppend(
+  tokenV2: string,
+  args: { parent_id: string; content?: string; markdown?: string; markdownFile?: string; workspaceId: string },
+): Promise<unknown> {
+  const parentId = formatNotionId(args.parent_id)
+  const hasContent = args.content !== undefined
+  const hasMarkdown = args.markdown !== undefined || args.markdownFile !== undefined
 
-    if (hasContent && hasMarkdown) {
-      throw new Error('--content and --markdown/--markdown-file are mutually exclusive')
-    }
+  if (hasContent && hasMarkdown) {
+    throw new Error('--content and --markdown/--markdown-file are mutually exclusive')
+  }
 
-    if (!hasContent && !hasMarkdown) {
-      throw new Error('Provide either --content or --markdown/--markdown-file')
-    }
+  if (!hasContent && !hasMarkdown) {
+    throw new Error('Provide either --content or --markdown/--markdown-file')
+  }
 
-    let defs: BlockDefinition[]
+  let defs: BlockDefinition[]
 
-    if (hasMarkdown) {
-      const markdown = readMarkdownInput({ markdown: options.markdown, markdownFile: options.markdownFile })
-      defs = markdownToBlocks(markdown)
-    } else {
-      defs = parseBlockDefinitions(options.content!)
-    }
+  if (hasMarkdown) {
+    const markdown = readMarkdownInput({ markdown: args.markdown, markdownFile: args.markdownFile })
+    defs = markdownToBlocks(markdown)
+  } else {
+    defs = parseBlockDefinitions(args.content!)
+  }
 
-    if (defs.length === 0) {
-      throw new Error('Content must include at least one block definition')
-    }
+  if (defs.length === 0) {
+    throw new Error('Content must include at least one block definition')
+  }
 
-    const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const spaceId = await resolveSpaceId(creds.token_v2, parentId)
-    const operations: SaveOperation[] = []
-    const newBlockIds: string[] = []
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  const spaceId = await resolveSpaceId(tokenV2, parentId)
+  const operations: SaveOperation[] = []
+  const newBlockIds: string[] = []
 
-    for (const def of defs) {
-      const newBlockId = generateId()
-      newBlockIds.push(newBlockId)
+  for (const def of defs) {
+    const newBlockId = generateId()
+    newBlockIds.push(newBlockId)
 
-      operations.push(
-        {
-          pointer: { table: 'block', id: newBlockId, spaceId },
-          command: 'set',
-          path: [],
-          args: {
-            type: def.type,
-            id: newBlockId,
-            version: 1,
-            parent_id: parentId,
-            parent_table: 'block',
-            alive: true,
-            properties: def.properties ?? {},
-            space_id: spaceId,
+    operations.push(
+      {
+        pointer: { table: 'block', id: newBlockId, spaceId },
+        command: 'set',
+        path: [],
+        args: {
+          type: def.type,
+          id: newBlockId,
+          version: 1,
+          parent_id: parentId,
+          parent_table: 'block',
+          alive: true,
+          properties: def.properties ?? {},
+          space_id: spaceId,
+        },
+      },
+      {
+        pointer: { table: 'block', id: parentId, spaceId },
+        command: 'listAfter',
+        path: ['content'],
+        args: { id: newBlockId },
+      },
+    )
+  }
+
+  const payload: SaveTransactionsRequest = {
+    requestId: generateId(),
+    transactions: [{ id: generateId(), spaceId, operations }],
+  }
+  await internalRequest(tokenV2, 'saveTransactions', payload)
+
+  return { created: newBlockIds }
+}
+
+export async function handleBlockUpdate(
+  tokenV2: string,
+  args: { block_id: string; content: string; workspaceId: string },
+): Promise<unknown> {
+  const blockId = formatNotionId(args.block_id)
+  const content = parseUpdateContent(args.content)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  const spaceId = await resolveSpaceId(tokenV2, blockId)
+
+  const payload: SaveTransactionsRequest = {
+    requestId: generateId(),
+    transactions: [
+      {
+        id: generateId(),
+        spaceId,
+        operations: [
+          {
+            pointer: { table: 'block', id: blockId, spaceId },
+            command: 'update',
+            path: [],
+            args: content,
           },
-        },
-        {
-          pointer: { table: 'block', id: parentId, spaceId },
-          command: 'listAfter',
-          path: ['content'],
-          args: { id: newBlockId },
-        },
-      )
-    }
+        ],
+      },
+    ],
+  }
 
-    const payload: SaveTransactionsRequest = {
-      requestId: generateId(),
-      transactions: [{ id: generateId(), spaceId, operations }],
-    }
-    await internalRequest(creds.token_v2, 'saveTransactions', payload)
+  await internalRequest(tokenV2, 'saveTransactions', payload)
 
-    console.log(formatOutput({ created: newBlockIds }, options.pretty))
+  const verifyResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
+    requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
+  })) as SyncRecordValuesResponse
+  const updatedBlock = assertBlock(getBlockById(verifyResponse.recordMap.block, blockId), blockId)
+
+  return formatBlockValue(updatedBlock as Record<string, unknown>)
+}
+
+export async function handleBlockDelete(
+  tokenV2: string,
+  args: { block_id: string; workspaceId: string },
+): Promise<unknown> {
+  const blockId = formatNotionId(args.block_id)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  const blockResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
+    requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
+  })) as SyncRecordValuesResponse
+
+  const block = assertBlock(getBlockById(blockResponse.recordMap.block, blockId), blockId)
+  if (!block.parent_id) {
+    throw new Error(`Block has no parent_id: ${blockId}`)
+  }
+
+  const parentId = block.parent_id
+  const spaceId = await resolveSpaceId(tokenV2, blockId)
+
+  const payload: SaveTransactionsRequest = {
+    requestId: generateId(),
+    transactions: [
+      {
+        id: generateId(),
+        spaceId,
+        operations: [
+          {
+            pointer: { table: 'block', id: blockId, spaceId },
+            command: 'update',
+            path: [],
+            args: { alive: false },
+          },
+          {
+            pointer: { table: 'block', id: parentId, spaceId },
+            command: 'listRemove',
+            path: ['content'],
+            args: { id: blockId },
+          },
+        ],
+      },
+    ],
+  }
+
+  await internalRequest(tokenV2, 'saveTransactions', payload)
+
+  return { deleted: true, id: blockId }
+}
+
+async function appendAction(rawParentId: string, options: AppendOptions): Promise<void> {
+  try {
+    const creds = await getCredentialsOrExit()
+    const result = await handleBlockAppend(creds.token_v2, {
+      parent_id: formatNotionId(rawParentId),
+      content: options.content,
+      markdown: options.markdown,
+      markdownFile: options.markdownFile,
+      workspaceId: options.workspaceId,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: getErrorMessage(error) }))
     process.exit(1)
@@ -306,39 +404,14 @@ async function appendAction(rawParentId: string, options: AppendOptions): Promis
 }
 
 async function updateAction(rawBlockId: string, options: UpdateOptions): Promise<void> {
-  const blockId = formatNotionId(rawBlockId)
   try {
-    const content = parseUpdateContent(options.content)
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const spaceId = await resolveSpaceId(creds.token_v2, blockId)
-
-    const payload: SaveTransactionsRequest = {
-      requestId: generateId(),
-      transactions: [
-        {
-          id: generateId(),
-          spaceId,
-          operations: [
-            {
-              pointer: { table: 'block', id: blockId, spaceId },
-              command: 'update',
-              path: [],
-              args: content,
-            },
-          ],
-        },
-      ],
-    }
-
-    await internalRequest(creds.token_v2, 'saveTransactions', payload)
-
-    const verifyResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
-      requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
-    })) as SyncRecordValuesResponse
-    const updatedBlock = assertBlock(getBlockById(verifyResponse.recordMap.block, blockId), blockId)
-
-    console.log(formatOutput(formatBlockValue(updatedBlock as Record<string, unknown>), options.pretty))
+    const result = await handleBlockUpdate(creds.token_v2, {
+      block_id: formatNotionId(rawBlockId),
+      content: options.content,
+      workspaceId: options.workspaceId,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: getErrorMessage(error) }))
     process.exit(1)
@@ -346,49 +419,13 @@ async function updateAction(rawBlockId: string, options: UpdateOptions): Promise
 }
 
 async function deleteAction(rawBlockId: string, options: WorkspaceOptions): Promise<void> {
-  const blockId = formatNotionId(rawBlockId)
   try {
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const blockResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
-      requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
-    })) as SyncRecordValuesResponse
-
-    const block = assertBlock(getBlockById(blockResponse.recordMap.block, blockId), blockId)
-    if (!block.parent_id) {
-      throw new Error(`Block has no parent_id: ${blockId}`)
-    }
-
-    const parentId = block.parent_id
-    const spaceId = await resolveSpaceId(creds.token_v2, blockId)
-
-    const payload: SaveTransactionsRequest = {
-      requestId: generateId(),
-      transactions: [
-        {
-          id: generateId(),
-          spaceId,
-          operations: [
-            {
-              pointer: { table: 'block', id: blockId, spaceId },
-              command: 'update',
-              path: [],
-              args: { alive: false },
-            },
-            {
-              pointer: { table: 'block', id: parentId, spaceId },
-              command: 'listRemove',
-              path: ['content'],
-              args: { id: blockId },
-            },
-          ],
-        },
-      ],
-    }
-
-    await internalRequest(creds.token_v2, 'saveTransactions', payload)
-
-    console.log(formatOutput({ deleted: true, id: blockId }, options.pretty))
+    const result = await handleBlockDelete(creds.token_v2, {
+      block_id: formatNotionId(rawBlockId),
+      workspaceId: options.workspaceId,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: getErrorMessage(error) }))
     process.exit(1)

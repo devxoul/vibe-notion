@@ -37,6 +37,26 @@ export async function getCredentialsOrExit(): Promise<NotionCredentials> {
   process.exit(1)
 }
 
+export async function getCredentialsOrThrow(): Promise<NotionCredentials> {
+  const manager = new CredentialManager()
+  const creds = await manager.getCredentials()
+  if (creds) return creds
+
+  // Auto-extract from Notion desktop app
+  try {
+    const extractor = new TokenExtractor()
+    const extracted = await extractor.extract()
+    if (extracted) {
+      await manager.setCredentials(extracted)
+      return extracted
+    }
+  } catch {
+    // Extraction failed, fall through to error
+  }
+
+  throw new Error('Not authenticated. Run: vibe-notion auth extract')
+}
+
 export async function resolveSpaceId(tokenV2: string, blockId: string): Promise<string> {
   const result = (await internalRequest(tokenV2, 'syncRecordValues', {
     requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],

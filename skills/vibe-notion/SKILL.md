@@ -320,6 +320,74 @@ vibe-notion comment create "Replying to thread" --discussion <discussion_id> --w
 vibe-notion comment get <comment_id> --workspace-id <workspace_id> --pretty
 ```
 
+## Batch Operations
+
+Run multiple write operations in a single CLI call. Use this instead of calling the CLI repeatedly when you need to create, update, or delete multiple things at once. Saves tokens and reduces round-trips.
+
+```bash
+# Inline JSON
+vibe-notion batch --workspace-id <workspace_id> '<operations_json>'
+
+# From file (for large payloads)
+vibe-notion batch --workspace-id <workspace_id> --file ./operations.json '[]'
+```
+
+**Supported actions** (12 total):
+
+| Action | Description |
+|--------|-------------|
+| `page.create` | Create a page |
+| `page.update` | Update page title, icon, or content |
+| `page.archive` | Archive a page |
+| `block.append` | Append blocks to a parent |
+| `block.update` | Update a block |
+| `block.delete` | Delete a block |
+| `comment.create` | Create a comment |
+| `database.create` | Create a database |
+| `database.update` | Update database title or schema |
+| `database.delete-property` | Delete a database property |
+| `database.add-row` | Add a row to a database |
+| `database.update-row` | Update properties on a database row |
+
+**Operation format**: Each operation is an object with `action` plus the same fields you'd pass to the individual command handler. Example with mixed actions:
+
+```json
+[
+  {"action": "database.add-row", "database_id": "<db_id>", "title": "Task A", "properties": {"Status": "To Do"}},
+  {"action": "database.add-row", "database_id": "<db_id>", "title": "Task B", "properties": {"Status": "In Progress"}},
+  {"action": "page.update", "page_id": "<page_id>", "title": "Updated Summary"}
+]
+```
+
+**Output format**:
+
+```json
+{
+  "results": [
+    {"index": 0, "action": "database.add-row", "success": true, "data": {"id": "row-uuid-1", "...": "..."}},
+    {"index": 1, "action": "database.add-row", "success": true, "data": {"id": "row-uuid-2", "...": "..."}},
+    {"index": 2, "action": "page.update", "success": true, "data": {"id": "page-uuid", "...": "..."}}
+  ],
+  "total": 3,
+  "succeeded": 3,
+  "failed": 0
+}
+```
+
+**Fail-fast behavior**: Operations run sequentially. If any operation fails, execution stops immediately. The output will contain results for all completed operations plus the failed one. The process exits with code 1 on failure, 0 on success.
+
+```json
+{
+  "results": [
+    {"index": 0, "action": "database.add-row", "success": true, "data": {"...": "..."}},
+    {"index": 1, "action": "page.update", "success": false, "error": "Page not found"}
+  ],
+  "total": 3,
+  "succeeded": 1,
+  "failed": 1
+}
+```
+
 ### Search Command
 
 ```bash

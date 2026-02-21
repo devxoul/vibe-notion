@@ -5,6 +5,7 @@ import pkg from '../../../package.json' with { type: 'json' }
 import { setActiveUserId } from './client'
 import {
   authCommand,
+  batchCommand,
   blockCommand,
   commentCommand,
   databaseCommand,
@@ -31,6 +32,7 @@ program
   })
 
 program.addCommand(authCommand)
+program.addCommand(batchCommand)
 program.addCommand(blockCommand)
 program.addCommand(commentCommand)
 program.addCommand(databaseCommand)

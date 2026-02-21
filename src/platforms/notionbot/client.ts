@@ -69,3 +69,11 @@ export function getClient(): NotionClient {
   }
   return new NotionClient(token)
 }
+
+export function getClientOrThrow(): NotionClient {
+  const token = process.env.NOTION_TOKEN
+  if (!token) {
+    throw new Error('NOTION_TOKEN environment variable is not set')
+  }
+  return new NotionClient(token)
+}

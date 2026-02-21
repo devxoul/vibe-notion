@@ -1,3 +1,6 @@
+import { writeFileSync, unlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
 import { runNotionCLI, parseJSON, generateTestId, waitForRateLimit } from './helpers'
 import { NOTION_E2E_PAGE_ID, validateNotionEnvironment } from './config'
@@ -1168,5 +1171,228 @@ describe('Notion E2E Tests', () => {
 
       await waitForRateLimit()
     }, 15000)
+  })
+
+  // ── batch ────────────────────────────────────────────────────────────
+
+  describe('batch', () => {
+    const batchPageIds: string[] = []
+
+    afterAll(async () => {
+      for (const pageId of batchPageIds) {
+        try {
+          await runNotionCLI(['page', 'archive', '--workspace-id', workspaceId, pageId])
+          await waitForRateLimit()
+        } catch {}
+      }
+    }, 30000)
+
+    test('batch with single page.create', async () => {
+      await waitForRateLimit(2000)
+      const testId = generateTestId()
+      const operations = [
+        {
+          action: 'page.create',
+          parent_id: containerId,
+          title: `e2e-batch-single-${testId}`,
+        },
+      ]
+
+      const result = await runNotionCLI([
+        'batch',
+        '--workspace-id',
+        workspaceId,
+        JSON.stringify(operations),
+      ])
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{
+        results: Array<{ index: number; action: string; success: boolean; data?: { id: string } }>
+        total: number
+        succeeded: number
+        failed: number
+      }>(result.stdout)
+      expect(data?.total).toBe(1)
+      expect(data?.succeeded).toBe(1)
+      expect(data?.failed).toBe(0)
+      expect(data?.results).toHaveLength(1)
+      expect(data?.results[0].index).toBe(0)
+      expect(data?.results[0].action).toBe('page.create')
+      expect(data?.results[0].success).toBe(true)
+      expect(data?.results[0].data?.id).toBeTruthy()
+
+      batchPageIds.push(data!.results[0].data!.id)
+      await waitForRateLimit()
+    }, 30000)
+
+    test('batch with multiple operations', async () => {
+      await waitForRateLimit(2000)
+      const testId = generateTestId()
+      const operations = [
+        {
+          action: 'page.create',
+          parent_id: containerId,
+          title: `e2e-batch-multi-${testId}`,
+        },
+      ]
+
+      // first create the page
+      const createResult = await runNotionCLI([
+        'batch',
+        '--workspace-id',
+        workspaceId,
+        JSON.stringify(operations),
+      ])
+      expect(createResult.exitCode).toBe(0)
+
+      const createData = parseJSON<{
+        results: Array<{ index: number; action: string; success: boolean; data?: { id: string } }>
+      }>(createResult.stdout)
+      const createdPageId = createData!.results[0].data!.id
+      batchPageIds.push(createdPageId)
+      await waitForRateLimit()
+
+      // then batch: create another page + archive the first
+      const multiOps = [
+        {
+          action: 'page.create',
+          parent_id: containerId,
+          title: `e2e-batch-multi2-${testId}`,
+        },
+        {
+          action: 'page.archive',
+          page_id: createdPageId,
+        },
+      ]
+
+      const result = await runNotionCLI([
+        'batch',
+        '--workspace-id',
+        workspaceId,
+        JSON.stringify(multiOps),
+      ])
+      expect(result.exitCode).toBe(0)
+
+      const data = parseJSON<{
+        results: Array<{ index: number; action: string; success: boolean; data?: { id: string } }>
+        total: number
+        succeeded: number
+        failed: number
+      }>(result.stdout)
+      expect(data?.total).toBe(2)
+      expect(data?.succeeded).toBe(2)
+      expect(data?.failed).toBe(0)
+      expect(data?.results).toHaveLength(2)
+      expect(data?.results[0].action).toBe('page.create')
+      expect(data?.results[0].success).toBe(true)
+      expect(data?.results[1].action).toBe('page.archive')
+      expect(data?.results[1].success).toBe(true)
+
+      if (data?.results[0].data?.id) {
+        batchPageIds.push(data.results[0].data.id)
+      }
+
+      await waitForRateLimit()
+    }, 30000)
+
+    test('fail-fast on invalid operation', async () => {
+      await waitForRateLimit(2000)
+      const operations = [
+        {
+          action: 'page.archive',
+          page_id: '00000000-0000-0000-0000-000000000000',
+        },
+      ]
+
+      const result = await runNotionCLI([
+        'batch',
+        '--workspace-id',
+        workspaceId,
+        JSON.stringify(operations),
+      ])
+      expect(result.exitCode).toBe(1)
+
+      const data = parseJSON<{
+        results: Array<{ index: number; action: string; success: boolean; error?: string }>
+        total: number
+        succeeded: number
+        failed: number
+      }>(result.stdout)
+      expect(data?.results).toHaveLength(1)
+      expect(data?.failed).toBe(1)
+      expect(data?.succeeded).toBe(0)
+      expect(data?.results[0].success).toBe(false)
+      expect(data?.results[0].error).toBeTruthy()
+
+      await waitForRateLimit()
+    }, 30000)
+
+    test('validation error on invalid action name', async () => {
+      const operations = [
+        {
+          action: 'invalid.action',
+          some_arg: 'value',
+        },
+      ]
+
+      const result = await runNotionCLI([
+        'batch',
+        '--workspace-id',
+        workspaceId,
+        JSON.stringify(operations),
+      ])
+      expect(result.exitCode).toBe(1)
+
+      const data = parseJSON<{ error: string }>(result.stderr || result.stdout)
+      expect(data?.error).toBeTruthy()
+
+      await waitForRateLimit()
+    }, 15000)
+
+    test('--file input reads operations from file', async () => {
+      await waitForRateLimit(2000)
+      const testId = generateTestId()
+      const operations = [
+        {
+          action: 'page.create',
+          parent_id: containerId,
+          title: `e2e-batch-file-${testId}`,
+        },
+      ]
+
+      const tmpFile = join(tmpdir(), `e2e-batch-${testId}.json`)
+      writeFileSync(tmpFile, JSON.stringify(operations))
+
+      try {
+        const result = await runNotionCLI([
+          'batch',
+          '--workspace-id',
+          workspaceId,
+          '--file',
+          tmpFile,
+          '_', // placeholder for required <operations> argument
+        ])
+        expect(result.exitCode).toBe(0)
+
+        const data = parseJSON<{
+          results: Array<{ index: number; action: string; success: boolean; data?: { id: string } }>
+          total: number
+          succeeded: number
+          failed: number
+        }>(result.stdout)
+        expect(data?.total).toBe(1)
+        expect(data?.succeeded).toBe(1)
+        expect(data?.failed).toBe(0)
+        expect(data?.results[0].success).toBe(true)
+
+        if (data?.results[0].data?.id) {
+          batchPageIds.push(data.results[0].data.id)
+        }
+      } finally {
+        try { unlinkSync(tmpFile) } catch {}
+      }
+
+      await waitForRateLimit()
+    }, 30000)
   })
 })

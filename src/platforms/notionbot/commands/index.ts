@@ -1,4 +1,5 @@
 export { authCommand } from './auth'
+export { batchCommand } from './batch'
 export { blockCommand } from './block'
 export { commentCommand } from './comment'
 export { databaseCommand } from './database'

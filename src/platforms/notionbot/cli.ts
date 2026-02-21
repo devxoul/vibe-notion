@@ -4,6 +4,7 @@ import { Command } from 'commander'
 import pkg from '../../../package.json' with { type: 'json' }
 import {
   authCommand,
+  batchCommand,
   blockCommand,
   commentCommand,
   databaseCommand,
@@ -17,6 +18,7 @@ const program = new Command()
 program.name('vibe-notionbot').description('Notion official API CLI for AI agents').version(pkg.version)
 
 program.addCommand(authCommand)
+program.addCommand(batchCommand)
 program.addCommand(blockCommand)
 program.addCommand(commentCommand)
 program.addCommand(databaseCommand)

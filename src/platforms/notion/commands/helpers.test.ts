@@ -44,6 +44,24 @@ async function getCredentialsOrExit() {
   process.exit(1)
 }
 
+async function getCredentialsOrThrow() {
+  const creds = await _mockGetCredentials()
+  if (creds) return creds
+
+  // Auto-extract from Notion desktop app
+  try {
+    const extracted = await _mockExtract()
+    if (extracted) {
+      await _mockSetCredentials(extracted)
+      return extracted
+    }
+  } catch {
+    // Extraction failed, fall through to error
+  }
+
+  throw new Error('Not authenticated. Run: vibe-notion auth extract')
+}
+
 async function resolveSpaceId(tokenV2: string, blockId: string): Promise<string> {
   const result = (await _mockInternalRequest(tokenV2, 'syncRecordValues', {
     requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
@@ -240,6 +258,50 @@ describe('getCredentialsOrExit', () => {
     } finally {
       process.exit = originalExit
     }
+  })
+})
+
+describe('getCredentialsOrThrow', () => {
+  test('returns credentials when they exist', async () => {
+    const credentials = { token_v2: 'test_token', space_id: 'test_space' }
+    _mockGetCredentials = mock(() => Promise.resolve(credentials))
+
+    const result = await getCredentialsOrThrow()
+    expect(result).toEqual(credentials)
+  })
+
+  test('throws an Error when no credentials', async () => {
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.resolve(null))
+
+    await expect(getCredentialsOrThrow()).rejects.toThrow('Not authenticated. Run: vibe-notion auth extract')
+  })
+
+  test('auto-extracts and returns credentials when no stored credentials', async () => {
+    const extracted = { token_v2: 'extracted-token', user_id: 'user-1' }
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.resolve(extracted))
+    _mockSetCredentials = mock(() => Promise.resolve())
+
+    const result = await getCredentialsOrThrow()
+    expect(result).toEqual(extracted)
+  })
+
+  test('saves auto-extracted credentials', async () => {
+    const extracted = { token_v2: 'extracted-token', user_id: 'user-1' }
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.resolve(extracted))
+    _mockSetCredentials = mock(() => Promise.resolve())
+
+    await getCredentialsOrThrow()
+    expect(_mockSetCredentials).toHaveBeenCalledWith(extracted)
+  })
+
+  test('throws when auto-extraction throws', async () => {
+    _mockGetCredentials = mock(() => Promise.resolve(null))
+    _mockExtract = mock(() => Promise.reject(new Error('Notion directory not found')))
+
+    await expect(getCredentialsOrThrow()).rejects.toThrow('Not authenticated. Run: vibe-notion auth extract')
   })
 })
 
