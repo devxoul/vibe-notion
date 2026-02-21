@@ -174,7 +174,7 @@ vibe-notionbot comment create "Replying to thread" --discussion <discussion_id>
 vibe-notionbot comment get <comment_id>
 ```
 
-### Batch Command
+## Batch Operations
 
 Run multiple write operations in a single CLI call. Use this instead of calling the CLI repeatedly when you need to create, update, or delete multiple things at once. Saves tokens and reduces round-trips.
 
@@ -183,7 +183,7 @@ Run multiple write operations in a single CLI call. Use this instead of calling 
 vibe-notionbot batch '<operations_json>'
 
 # From file (for large payloads)
-vibe-notionbot batch --file ./operations.json '<ignored>'
+vibe-notionbot batch --file ./operations.json '[]'
 ```
 
 **Supported actions** (10 total):

@@ -320,7 +320,7 @@ vibe-notion comment create "Replying to thread" --discussion <discussion_id> --w
 vibe-notion comment get <comment_id> --workspace-id <workspace_id> --pretty
 ```
 
-### Batch Command
+## Batch Operations
 
 Run multiple write operations in a single CLI call. Use this instead of calling the CLI repeatedly when you need to create, update, or delete multiple things at once. Saves tokens and reduces round-trips.
 
@@ -329,7 +329,7 @@ Run multiple write operations in a single CLI call. Use this instead of calling 
 vibe-notion batch --workspace-id <workspace_id> '<operations_json>'
 
 # From file (for large payloads)
-vibe-notion batch --workspace-id <workspace_id> --file ./operations.json '<ignored>'
+vibe-notion batch --workspace-id <workspace_id> --file ./operations.json '[]'
 ```
 
 **Supported actions** (12 total):
