@@ -40,56 +40,86 @@ async function appendAction(
   rawParentId: string,
   options: { pretty?: boolean; content?: string; markdown?: string; markdownFile?: string },
 ): Promise<void> {
-  const parentId = formatNotionId(rawParentId)
   try {
     const client = getClient()
-    let children: BlockObjectRequest[]
-
-    // Check mutual exclusivity
-    const hasMarkdown = options.markdown || options.markdownFile
-    if (options.content && hasMarkdown) {
-      throw new Error('Provide either --markdown or --markdown-file, not both')
-    }
-
-    if (!options.content && !hasMarkdown) {
-      throw new Error('Provide either --content or --markdown/--markdown-file')
-    }
-
-    if (hasMarkdown) {
-      const markdown = readMarkdownInput({ markdown: options.markdown, markdownFile: options.markdownFile })
-      children = markdownToOfficialBlocks(markdown)
-    } else {
-      children = JSON.parse(options.content!)
-    }
-
-    const results = await client.appendBlockChildren(parentId, children)
-    console.log(formatOutput(formatAppendResponse(results), options.pretty))
+    const result = await handleBlockAppend(client, {
+      parent_id: formatNotionId(rawParentId),
+      content: options.content,
+      markdown: options.markdown,
+      markdownFile: options.markdownFile,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
 }
 
 async function updateAction(rawBlockId: string, options: { pretty?: boolean; content: string }): Promise<void> {
-  const blockId = formatNotionId(rawBlockId)
   try {
     const client = getClient()
-    const content = JSON.parse(options.content)
-    const result = await client.blocks.update({ block_id: blockId, ...content })
-    console.log(formatOutput(formatBlock(result as Record<string, unknown>), options.pretty))
+    const result = await handleBlockUpdate(client, {
+      block_id: formatNotionId(rawBlockId),
+      content: options.content,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
 }
 
 async function deleteAction(rawBlockId: string, options: { pretty?: boolean }): Promise<void> {
-  const blockId = formatNotionId(rawBlockId)
   try {
     const client = getClient()
-    await client.blocks.delete({ block_id: blockId })
-    console.log(formatOutput({ deleted: true, id: blockId }, options.pretty))
+    const result = await handleBlockDelete(client, {
+      block_id: formatNotionId(rawBlockId),
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
+}
+
+export async function handleBlockAppend(
+  client: ReturnType<typeof getClient>,
+  args: { parent_id: string; content?: string; markdown?: string; markdownFile?: string },
+): Promise<unknown> {
+  let children: BlockObjectRequest[]
+
+  const hasMarkdown = args.markdown || args.markdownFile
+  if (args.content && hasMarkdown) {
+    throw new Error('Provide either --markdown or --markdown-file, not both')
+  }
+
+  if (!args.content && !hasMarkdown) {
+    throw new Error('Provide either --content or --markdown/--markdown-file')
+  }
+
+  if (hasMarkdown) {
+    const markdown = readMarkdownInput({ markdown: args.markdown, markdownFile: args.markdownFile })
+    children = markdownToOfficialBlocks(markdown)
+  } else {
+    children = JSON.parse(args.content!)
+  }
+
+  const results = await client.appendBlockChildren(args.parent_id, children)
+  return formatAppendResponse(results)
+}
+
+export async function handleBlockUpdate(
+  client: ReturnType<typeof getClient>,
+  args: { block_id: string; content: string },
+): Promise<unknown> {
+  const content = JSON.parse(args.content)
+  const result = await client.blocks.update({ block_id: args.block_id, ...content })
+  return formatBlock(result as Record<string, unknown>)
+}
+
+export async function handleBlockDelete(
+  client: ReturnType<typeof getClient>,
+  args: { block_id: string },
+): Promise<unknown> {
+  await client.blocks.delete({ block_id: args.block_id })
+  return { deleted: true, id: args.block_id }
 }
 
 export const blockCommand = new Command('block')
