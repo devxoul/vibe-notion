@@ -63,7 +63,6 @@ function setupDefaultMocks() {
   }))
 
   mock.module('@/shared/batch/types', () => ({
-    NOTION_ACTIONS: validActions,
     validateOperations: mockValidateOperations,
   }))
 

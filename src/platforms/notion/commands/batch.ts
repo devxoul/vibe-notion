@@ -5,7 +5,6 @@ import {
   type BatchOperation,
   type BatchOutput,
   type BatchResult,
-  NOTION_ACTIONS,
   type NotionHandler,
   validateOperations,
 } from '@/shared/batch/types'
@@ -69,7 +68,7 @@ function toErrorMessage(error: unknown): string {
 
 export async function executeBatch(operationsArg: string, options: BatchCommandOptions): Promise<void> {
   const operations = parseOperations(operationsArg, options.file)
-  validateOperations(operations, NOTION_ACTIONS)
+  validateOperations(operations, Object.keys(NOTION_ACTION_REGISTRY))
 
   const getCredentialsOrThrow = helpers.getCredentialsOrThrow ?? helpers.getCredentialsOrExit
   const resolveAndSetActiveUserId = helpers.resolveAndSetActiveUserId
