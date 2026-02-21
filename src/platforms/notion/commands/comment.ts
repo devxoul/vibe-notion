@@ -100,140 +100,153 @@ async function listAction(options: ListOptions): Promise<void> {
   }
 }
 
+export async function handleCommentCreate(
+  tokenV2: string,
+  args: { text: string; page?: string; discussion?: string; workspaceId: string },
+): Promise<unknown> {
+  if (!args.page && !args.discussion) {
+    throw new Error('Either --page or --discussion is required')
+  }
+
+  if (args.page && args.discussion) {
+    throw new Error('Cannot specify both --page and --discussion')
+  }
+
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+
+  if (args.page) {
+    const pageId = formatNotionId(args.page)
+    const spaceId = await resolveSpaceId(tokenV2, pageId)
+    const discussionId = generateId()
+    const commentId = generateId()
+
+    const payload: SaveTransactionsRequest = {
+      requestId: generateId(),
+      transactions: [
+        {
+          id: generateId(),
+          spaceId,
+          operations: [
+            {
+              pointer: { table: 'discussion', id: discussionId, spaceId },
+              command: 'set',
+              path: [],
+              args: {
+                id: discussionId,
+                version: 1,
+                parent_id: pageId,
+                parent_table: 'block',
+                comments: [commentId],
+                resolved: false,
+                space_id: spaceId,
+              },
+            },
+            {
+              pointer: { table: 'comment', id: commentId, spaceId },
+              command: 'set',
+              path: [],
+              args: {
+                id: commentId,
+                version: 1,
+                parent_id: discussionId,
+                parent_table: 'discussion',
+                text: [[args.text]],
+                alive: true,
+                space_id: spaceId,
+              },
+            },
+            {
+              pointer: { table: 'block', id: pageId, spaceId },
+              command: 'listAfter',
+              path: ['discussions'],
+              args: { id: discussionId },
+            },
+          ],
+        },
+      ],
+    }
+
+    await internalRequest(tokenV2, 'saveTransactions', payload)
+
+    return {
+      id: commentId,
+      discussion_id: discussionId,
+      text: args.text,
+    }
+  } else if (args.discussion) {
+    const discussionId = formatNotionId(args.discussion)
+
+    const discussionResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
+      requests: [{ pointer: { table: 'discussion', id: discussionId }, version: -1 }],
+    })) as SyncRecordValuesResponse
+
+    const discussionRecord = Object.values(discussionResponse.recordMap.discussion ?? {})[0]
+    const discussion = getRecordValue(discussionRecord)
+    if (!discussion) {
+      throw new Error(`Discussion not found: ${discussionId}`)
+    }
+
+    const spaceId = typeof discussion.space_id === 'string' ? discussion.space_id : ''
+    if (!spaceId) {
+      throw new Error(`Could not resolve space ID for discussion: ${discussionId}`)
+    }
+
+    const commentId = generateId()
+
+    const payload: SaveTransactionsRequest = {
+      requestId: generateId(),
+      transactions: [
+        {
+          id: generateId(),
+          spaceId,
+          operations: [
+            {
+              pointer: { table: 'comment', id: commentId, spaceId },
+              command: 'set',
+              path: [],
+              args: {
+                id: commentId,
+                version: 1,
+                parent_id: discussionId,
+                parent_table: 'discussion',
+                text: [[args.text]],
+                alive: true,
+                space_id: spaceId,
+              },
+            },
+            {
+              pointer: { table: 'discussion', id: discussionId, spaceId },
+              command: 'listAfter',
+              path: ['comments'],
+              args: { id: commentId },
+            },
+          ],
+        },
+      ],
+    }
+
+    await internalRequest(tokenV2, 'saveTransactions', payload)
+
+    return {
+      id: commentId,
+      discussion_id: discussionId,
+      text: args.text,
+    }
+  }
+
+  throw new Error('Unreachable code')
+}
+
 async function createAction(text: string, options: CreateOptions): Promise<void> {
   try {
-    if (!options.page && !options.discussion) {
-      throw new Error('Either --page or --discussion is required')
-    }
-
-    if (options.page && options.discussion) {
-      throw new Error('Cannot specify both --page and --discussion')
-    }
-
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-
-    if (options.page) {
-      const pageId = formatNotionId(options.page)
-      const spaceId = await resolveSpaceId(creds.token_v2, pageId)
-      const discussionId = generateId()
-      const commentId = generateId()
-
-      const payload: SaveTransactionsRequest = {
-        requestId: generateId(),
-        transactions: [
-          {
-            id: generateId(),
-            spaceId,
-            operations: [
-              {
-                pointer: { table: 'discussion', id: discussionId, spaceId },
-                command: 'set',
-                path: [],
-                args: {
-                  id: discussionId,
-                  version: 1,
-                  parent_id: pageId,
-                  parent_table: 'block',
-                  comments: [commentId],
-                  resolved: false,
-                  space_id: spaceId,
-                },
-              },
-              {
-                pointer: { table: 'comment', id: commentId, spaceId },
-                command: 'set',
-                path: [],
-                args: {
-                  id: commentId,
-                  version: 1,
-                  parent_id: discussionId,
-                  parent_table: 'discussion',
-                  text: [[text]],
-                  alive: true,
-                  space_id: spaceId,
-                },
-              },
-              {
-                pointer: { table: 'block', id: pageId, spaceId },
-                command: 'listAfter',
-                path: ['discussions'],
-                args: { id: discussionId },
-              },
-            ],
-          },
-        ],
-      }
-
-      await internalRequest(creds.token_v2, 'saveTransactions', payload)
-
-      const result = {
-        id: commentId,
-        discussion_id: discussionId,
-        text,
-      }
-      console.log(formatOutput(result, options.pretty))
-    } else if (options.discussion) {
-      const discussionId = formatNotionId(options.discussion)
-
-      const discussionResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
-        requests: [{ pointer: { table: 'discussion', id: discussionId }, version: -1 }],
-      })) as SyncRecordValuesResponse
-
-      const discussionRecord = Object.values(discussionResponse.recordMap.discussion ?? {})[0]
-      const discussion = getRecordValue(discussionRecord)
-      if (!discussion) {
-        throw new Error(`Discussion not found: ${discussionId}`)
-      }
-
-      const spaceId = typeof discussion.space_id === 'string' ? discussion.space_id : ''
-      if (!spaceId) {
-        throw new Error(`Could not resolve space ID for discussion: ${discussionId}`)
-      }
-
-      const commentId = generateId()
-
-      const payload: SaveTransactionsRequest = {
-        requestId: generateId(),
-        transactions: [
-          {
-            id: generateId(),
-            spaceId,
-            operations: [
-              {
-                pointer: { table: 'comment', id: commentId, spaceId },
-                command: 'set',
-                path: [],
-                args: {
-                  id: commentId,
-                  version: 1,
-                  parent_id: discussionId,
-                  parent_table: 'discussion',
-                  text: [[text]],
-                  alive: true,
-                  space_id: spaceId,
-                },
-              },
-              {
-                pointer: { table: 'discussion', id: discussionId, spaceId },
-                command: 'listAfter',
-                path: ['comments'],
-                args: { id: commentId },
-              },
-            ],
-          },
-        ],
-      }
-
-      await internalRequest(creds.token_v2, 'saveTransactions', payload)
-
-      const result = {
-        id: commentId,
-        discussion_id: discussionId,
-        text,
-      }
-      console.log(formatOutput(result, options.pretty))
-    }
+    const result = await handleCommentCreate(creds.token_v2, {
+      text,
+      page: options.page,
+      discussion: options.discussion,
+      workspaceId: options.workspaceId,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)

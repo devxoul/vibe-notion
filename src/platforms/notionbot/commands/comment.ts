@@ -29,42 +29,53 @@ async function listAction(options: {
   }
 }
 
+export async function handleCommentCreate(
+  client: ReturnType<typeof getClient>,
+  args: { text: string; page?: string; discussion?: string },
+): Promise<unknown> {
+  if (!args.page && !args.discussion) {
+    throw new Error('Either --page or --discussion is required')
+  }
+
+  if (args.page && args.discussion) {
+    throw new Error('Cannot specify both --page and --discussion')
+  }
+
+  const createParams: any = {
+    rich_text: [
+      {
+        type: 'text',
+        text: {
+          content: args.text,
+        },
+      },
+    ],
+  }
+
+  if (args.page) {
+    createParams.parent = {
+      page_id: formatNotionId(args.page),
+    }
+  } else if (args.discussion) {
+    createParams.discussion_id = formatNotionId(args.discussion)
+  }
+
+  const result = await client.comments.create(createParams)
+  return formatComment(result as Record<string, unknown>)
+}
+
 async function createAction(
   text: string,
   options: { page?: string; discussion?: string; pretty?: boolean },
 ): Promise<void> {
   try {
-    if (!options.page && !options.discussion) {
-      throw new Error('Either --page or --discussion is required')
-    }
-
-    if (options.page && options.discussion) {
-      throw new Error('Cannot specify both --page and --discussion')
-    }
-
     const client = getClient()
-
-    const createParams: any = {
-      rich_text: [
-        {
-          type: 'text',
-          text: {
-            content: text,
-          },
-        },
-      ],
-    }
-
-    if (options.page) {
-      createParams.parent = {
-        page_id: formatNotionId(options.page),
-      }
-    } else if (options.discussion) {
-      createParams.discussion_id = formatNotionId(options.discussion)
-    }
-
-    const result = await client.comments.create(createParams)
-    console.log(formatOutput(formatComment(result as Record<string, unknown>), options.pretty))
+    const result = await handleCommentCreate(client, {
+      text,
+      page: options.page,
+      discussion: options.discussion,
+    })
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     handleError(error as Error)
   }
