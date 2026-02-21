@@ -234,6 +234,7 @@ export async function handleBlockAppend(
   tokenV2: string,
   args: { parent_id: string; content?: string; markdown?: string; markdownFile?: string; workspaceId: string },
 ): Promise<unknown> {
+  const parentId = formatNotionId(args.parent_id)
   const hasContent = args.content !== undefined
   const hasMarkdown = args.markdown !== undefined || args.markdownFile !== undefined
 
@@ -259,7 +260,7 @@ export async function handleBlockAppend(
   }
 
   await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
-  const spaceId = await resolveSpaceId(tokenV2, args.parent_id)
+  const spaceId = await resolveSpaceId(tokenV2, parentId)
   const operations: SaveOperation[] = []
   const newBlockIds: string[] = []
 
@@ -276,7 +277,7 @@ export async function handleBlockAppend(
           type: def.type,
           id: newBlockId,
           version: 1,
-          parent_id: args.parent_id,
+          parent_id: parentId,
           parent_table: 'block',
           alive: true,
           properties: def.properties ?? {},
@@ -284,7 +285,7 @@ export async function handleBlockAppend(
         },
       },
       {
-        pointer: { table: 'block', id: args.parent_id, spaceId },
+        pointer: { table: 'block', id: parentId, spaceId },
         command: 'listAfter',
         path: ['content'],
         args: { id: newBlockId },
@@ -305,9 +306,10 @@ export async function handleBlockUpdate(
   tokenV2: string,
   args: { block_id: string; content: string; workspaceId: string },
 ): Promise<unknown> {
+  const blockId = formatNotionId(args.block_id)
   const content = parseUpdateContent(args.content)
   await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
-  const spaceId = await resolveSpaceId(tokenV2, args.block_id)
+  const spaceId = await resolveSpaceId(tokenV2, blockId)
 
   const payload: SaveTransactionsRequest = {
     requestId: generateId(),
@@ -317,7 +319,7 @@ export async function handleBlockUpdate(
         spaceId,
         operations: [
           {
-            pointer: { table: 'block', id: args.block_id, spaceId },
+            pointer: { table: 'block', id: blockId, spaceId },
             command: 'update',
             path: [],
             args: content,
@@ -330,9 +332,9 @@ export async function handleBlockUpdate(
   await internalRequest(tokenV2, 'saveTransactions', payload)
 
   const verifyResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
-    requests: [{ pointer: { table: 'block', id: args.block_id }, version: -1 }],
+    requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
   })) as SyncRecordValuesResponse
-  const updatedBlock = assertBlock(getBlockById(verifyResponse.recordMap.block, args.block_id), args.block_id)
+  const updatedBlock = assertBlock(getBlockById(verifyResponse.recordMap.block, blockId), blockId)
 
   return formatBlockValue(updatedBlock as Record<string, unknown>)
 }
@@ -341,18 +343,19 @@ export async function handleBlockDelete(
   tokenV2: string,
   args: { block_id: string; workspaceId: string },
 ): Promise<unknown> {
+  const blockId = formatNotionId(args.block_id)
   await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
   const blockResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
-    requests: [{ pointer: { table: 'block', id: args.block_id }, version: -1 }],
+    requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
   })) as SyncRecordValuesResponse
 
-  const block = assertBlock(getBlockById(blockResponse.recordMap.block, args.block_id), args.block_id)
+  const block = assertBlock(getBlockById(blockResponse.recordMap.block, blockId), blockId)
   if (!block.parent_id) {
-    throw new Error(`Block has no parent_id: ${args.block_id}`)
+    throw new Error(`Block has no parent_id: ${blockId}`)
   }
 
   const parentId = block.parent_id
-  const spaceId = await resolveSpaceId(tokenV2, args.block_id)
+  const spaceId = await resolveSpaceId(tokenV2, blockId)
 
   const payload: SaveTransactionsRequest = {
     requestId: generateId(),
@@ -362,7 +365,7 @@ export async function handleBlockDelete(
         spaceId,
         operations: [
           {
-            pointer: { table: 'block', id: args.block_id, spaceId },
+            pointer: { table: 'block', id: blockId, spaceId },
             command: 'update',
             path: [],
             args: { alive: false },
@@ -371,7 +374,7 @@ export async function handleBlockDelete(
             pointer: { table: 'block', id: parentId, spaceId },
             command: 'listRemove',
             path: ['content'],
-            args: { id: args.block_id },
+            args: { id: blockId },
           },
         ],
       },
@@ -380,7 +383,7 @@ export async function handleBlockDelete(
 
   await internalRequest(tokenV2, 'saveTransactions', payload)
 
-  return { deleted: true, id: args.block_id }
+  return { deleted: true, id: blockId }
 }
 
 async function appendAction(rawParentId: string, options: AppendOptions): Promise<void> {
