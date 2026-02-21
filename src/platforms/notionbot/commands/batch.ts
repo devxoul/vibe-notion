@@ -7,6 +7,7 @@ import {
   type BatchOutput,
   type BatchResult,
   type NotionBotHandler,
+  normalizeOperationArgs,
   validateOperations,
 } from '@/shared/batch/types'
 import { handleError } from '@/shared/utils/error-handler'
@@ -83,7 +84,7 @@ export async function executeBatch(operationsArg: string | undefined, options: B
     }
 
     try {
-      const data = await handler(client, { ...operation })
+      const data = await handler(client, normalizeOperationArgs(operation))
       results.push({ index, action, success: true, data })
     } catch (error) {
       results.push({

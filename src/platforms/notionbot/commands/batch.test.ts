@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test'
+import { normalizeOperationArgs } from '@/shared/batch/types'
 
 const validActions = [
   'page.create',
@@ -56,6 +57,7 @@ function setupDefaultMocks() {
 
   mock.module('@/shared/batch/types', () => ({
     NOTIONBOT_ACTIONS: validActions,
+    normalizeOperationArgs,
     validateOperations: mockValidateOperations,
   }))
 
@@ -269,6 +271,43 @@ describe('notionbot batch command', () => {
 
     expect(mockReadFileSync).toHaveBeenCalledWith('/tmp/ops.json', 'utf8')
     expect(output.length).toBe(1)
+    expect(exitCode).toBe(0)
+  })
+
+  test('object-valued properties are stringified before passing to handler', async () => {
+    mock.restore()
+    const { handlers } = setupDefaultMocks()
+    handlers.mockDatabaseCreate.mockImplementationOnce(async () => ({ id: 'db-1' }))
+
+    const { executeBatch } = await import('./batch')
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    let exitCode: number | undefined
+    const originalExit = process.exit
+    process.exit = ((code?: number) => {
+      exitCode = code
+      return undefined as never
+    }) as typeof process.exit
+
+    try {
+      // Given - properties is an object in JSON (not a pre-stringified string)
+      await executeBatch(
+        '[{"action":"database.create","parent":"page-1","title":"My DB","properties":{"Status":{"select":{}}}}]',
+        {},
+      )
+    } finally {
+      console.log = originalLog
+      process.exit = originalExit
+    }
+
+    // Then - handler receives properties as a JSON string, not an object
+    const callArgs = handlers.mockDatabaseCreate.mock.calls[0] as unknown[]
+    const handlerArgs = callArgs[1] as Record<string, unknown>
+    expect(handlerArgs.properties).toBe('{"Status":{"select":{}}}')
+    expect(handlerArgs.parent).toBe('page-1')
+    expect(handlerArgs.title).toBe('My DB')
     expect(exitCode).toBe(0)
   })
 
