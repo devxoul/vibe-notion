@@ -569,86 +569,15 @@ async function listAction(options: ListOptions): Promise<void> {
 }
 
 async function createAction(options: CreateOptions): Promise<void> {
-  const parent = formatNotionId(options.parent)
   try {
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const spaceId = await resolveSpaceId(creds.token_v2, parent)
-    const collId = generateId()
-    const viewId = generateId()
-    const blockId = generateId()
-    const parsedProperties = parseSchemaProperties(options.properties)
-    const mergedSchema: CollectionSchema = {
-      title: { name: 'Name', type: 'title' },
-      ...parsedProperties,
-    }
-    resolveRelationProperties(parsedProperties, mergedSchema, spaceId)
-    await resolveRollupReferences(parsedProperties, mergedSchema, creds.token_v2)
-
-    await internalRequest(creds.token_v2, 'saveTransactions', {
-      requestId: generateId(),
-      transactions: [
-        {
-          id: generateId(),
-          spaceId,
-          operations: [
-            {
-              pointer: { table: 'collection', id: collId, spaceId },
-              command: 'set',
-              path: [],
-              args: {
-                id: collId,
-                name: [[options.title]],
-                schema: mergedSchema,
-                parent_id: blockId,
-                parent_table: 'block',
-                alive: true,
-                space_id: spaceId,
-              },
-            },
-            {
-              pointer: { table: 'collection_view', id: viewId, spaceId },
-              command: 'set',
-              path: [],
-              args: {
-                id: viewId,
-                type: 'table',
-                name: 'Default view',
-                parent_id: blockId,
-                parent_table: 'block',
-                alive: true,
-                version: 1,
-              },
-            },
-            {
-              pointer: { table: 'block', id: blockId, spaceId },
-              command: 'set',
-              path: [],
-              args: {
-                type: 'collection_view_page',
-                id: blockId,
-                collection_id: collId,
-                view_ids: [viewId],
-                parent_id: parent,
-                parent_table: 'block',
-                alive: true,
-                space_id: spaceId,
-                version: 1,
-              },
-            },
-            {
-              pointer: { table: 'block', id: parent, spaceId },
-              command: 'listAfter',
-              path: ['content'],
-              args: { id: blockId },
-            },
-          ],
-        },
-      ],
+    const result = await handleDatabaseCreate(creds.token_v2, {
+      parent: options.parent,
+      title: options.title,
+      properties: options.properties,
+      workspaceId: options.workspaceId,
     })
-
-    const created = await fetchCollection(creds.token_v2, collId)
-    console.log(formatOutput(formatCollectionValue(created as Record<string, unknown>), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)
@@ -656,63 +585,15 @@ async function createAction(options: CreateOptions): Promise<void> {
 }
 
 async function updateAction(rawCollectionId: string, options: UpdateOptions): Promise<void> {
-  const collectionId = formatNotionId(rawCollectionId)
   try {
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const current = await fetchCollection(creds.token_v2, collectionId)
-
-    if (!options.title && !options.properties) {
-      console.log(formatOutput(formatCollectionValue(current as Record<string, unknown>), options.pretty))
-      return
-    }
-
-    const parentId = current.parent_id
-    if (!parentId) {
-      throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
-    }
-
-    const spaceId = await resolveSpaceId(creds.token_v2, parentId)
-    const updateArgs: {
-      name?: string[][]
-      schema?: CollectionSchema
-    } = {}
-
-    if (options.title) {
-      updateArgs.name = [[options.title]]
-    }
-
-    if (options.properties) {
-      const parsedProperties = parseSchemaProperties(options.properties)
-      const mergedSchema: CollectionSchema = {
-        ...(current.schema ?? {}),
-        ...parsedProperties,
-      }
-      resolveRelationProperties(parsedProperties, mergedSchema, spaceId)
-      await resolveRollupReferences(parsedProperties, mergedSchema, creds.token_v2)
-      updateArgs.schema = mergedSchema
-    }
-
-    await internalRequest(creds.token_v2, 'saveTransactions', {
-      requestId: generateId(),
-      transactions: [
-        {
-          id: generateId(),
-          spaceId,
-          operations: [
-            {
-              pointer: { table: 'collection', id: collectionId, spaceId },
-              command: 'update',
-              path: [],
-              args: updateArgs,
-            },
-          ],
-        },
-      ],
+    const result = await handleDatabaseUpdate(creds.token_v2, {
+      database_id: rawCollectionId,
+      title: options.title,
+      properties: options.properties,
+      workspaceId: options.workspaceId,
     })
-
-    const updated = await fetchCollection(creds.token_v2, collectionId)
-    console.log(formatOutput(formatCollectionValue(updated as Record<string, unknown>), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)
@@ -720,60 +601,14 @@ async function updateAction(rawCollectionId: string, options: UpdateOptions): Pr
 }
 
 async function deletePropertyAction(rawCollectionId: string, options: DeletePropertyOptions): Promise<void> {
-  const collectionId = formatNotionId(rawCollectionId)
   try {
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-    const current = await fetchCollection(creds.token_v2, collectionId)
-    const schema = current.schema ?? {}
-
-    const nameToId: Record<string, string> = {}
-    for (const [propId, prop] of Object.entries(schema)) {
-      if (prop.alive === false) continue
-      nameToId[prop.name] = propId
-    }
-
-    const propId = nameToId[options.property]
-    if (!propId) {
-      throw new Error(
-        `Unknown property: "${options.property}". Available: ${Object.values(schema)
-          .filter((p) => p.alive !== false)
-          .map((p) => p.name)
-          .join(', ')}`,
-      )
-    }
-
-    if (schema[propId].type === 'title') {
-      throw new Error('Cannot delete the title property')
-    }
-
-    const parentId = current.parent_id
-    if (!parentId) {
-      throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
-    }
-
-    const spaceId = await resolveSpaceId(creds.token_v2, parentId)
-
-    await internalRequest(creds.token_v2, 'saveTransactions', {
-      requestId: generateId(),
-      transactions: [
-        {
-          id: generateId(),
-          spaceId,
-          operations: [
-            {
-              pointer: { table: 'collection', id: collectionId, spaceId },
-              command: 'update',
-              path: ['schema', propId],
-              args: { name: `__deleted_${propId}_${Date.now()}`, alive: false },
-            },
-          ],
-        },
-      ],
+    const result = await handleDatabaseDeleteProperty(creds.token_v2, {
+      database_id: rawCollectionId,
+      property: options.property,
+      workspaceId: options.workspaceId,
     })
-
-    const updated = await fetchCollection(creds.token_v2, collectionId)
-    console.log(formatOutput(formatCollectionValue(updated as Record<string, unknown>), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)
@@ -781,88 +616,15 @@ async function deletePropertyAction(rawCollectionId: string, options: DeleteProp
 }
 
 async function addRowAction(rawCollectionId: string, options: AddRowOptions): Promise<void> {
-  const collectionId = formatNotionId(rawCollectionId)
   try {
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-
-    const collection = await fetchCollection(creds.token_v2, collectionId)
-    const parentBlockId = collection.parent_id
-    if (!parentBlockId) {
-      throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
-    }
-    const spaceId = await resolveSpaceId(creds.token_v2, parentBlockId)
-
-    const schema = collection.schema ?? {}
-    const nameToId: Record<string, string> = {}
-    for (const [propId, prop] of Object.entries(schema)) {
-      nameToId[prop.name] = propId
-    }
-
-    const optionValuesToRegister: Record<string, string[]> = {}
-
-    const registerSchemaOptionValue = (propId: string, value: string) => {
-      const schemaEntry = schema[propId]
-      const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
-      const existsInSchema = existingOptions.some((option) => getOptionValue(option) === value)
-      if (existsInSchema) {
-        return
-      }
-
-      const pendingValues = optionValuesToRegister[propId] ?? []
-      if (!pendingValues.includes(value)) {
-        optionValuesToRegister[propId] = [...pendingValues, value]
-      }
-    }
-
-    const newRowId = generateId()
-    const properties: Record<string, unknown> = { title: [[options.title]] }
-
-    if (options.properties) {
-      const parsed = JSON.parse(options.properties) as Record<string, unknown>
-      Object.assign(properties, serializeRowProperties(parsed, schema, nameToId, registerSchemaOptionValue))
-    }
-
-    const viewId = await resolveCollectionViewId(creds.token_v2, collectionId)
-
-    const schemaUpdateOperations = buildSchemaOptionUpdates(optionValuesToRegister, schema, collectionId, spaceId)
-
-    const operations = [
-      ...schemaUpdateOperations,
-      {
-        pointer: { table: 'block' as const, id: newRowId, spaceId },
-        command: 'set' as const,
-        path: [] as string[],
-        args: {
-          type: 'page',
-          id: newRowId,
-          version: 1,
-          parent_id: collectionId,
-          parent_table: 'collection',
-          alive: true,
-          properties,
-          space_id: spaceId,
-        },
-      },
-      {
-        pointer: { table: 'collection_view' as const, id: viewId, spaceId },
-        command: 'listAfter' as const,
-        path: ['page_sort'],
-        args: { id: newRowId },
-      },
-    ]
-
-    await internalRequest(creds.token_v2, 'saveTransactions', {
-      requestId: generateId(),
-      transactions: [{ id: generateId(), spaceId, operations }],
+    const result = await handleDatabaseAddRow(creds.token_v2, {
+      database_id: rawCollectionId,
+      title: options.title,
+      properties: options.properties,
+      workspaceId: options.workspaceId,
     })
-
-    const created = (await internalRequest(creds.token_v2, 'syncRecordValues', {
-      requests: [{ pointer: { table: 'block', id: newRowId }, version: -1 }],
-    })) as { recordMap: { block: Record<string, Record<string, unknown>> } }
-
-    const createdBlock = Object.values(created.recordMap.block)[0]
-    console.log(formatOutput(formatBlockRecord(createdBlock), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)
@@ -870,87 +632,14 @@ async function addRowAction(rawCollectionId: string, options: AddRowOptions): Pr
 }
 
 async function updateRowAction(rawRowId: string, options: UpdateRowOptions): Promise<void> {
-  const rowId = formatNotionId(rawRowId)
   try {
     const creds = await getCredentialsOrExit()
-    await resolveAndSetActiveUserId(creds.token_v2, options.workspaceId)
-
-    const rowResponse = (await internalRequest(creds.token_v2, 'syncRecordValues', {
-      requests: [{ pointer: { table: 'block', id: rowId }, version: -1 }],
-    })) as SyncRecordValuesResponse
-
-    const rowRecord = rowResponse.recordMap?.block?.[rowId] ?? Object.values(rowResponse.recordMap?.block ?? {})[0]
-    const blockValue = rowRecord?.value as
-      | {
-          parent_table?: string
-          parent_id?: string
-          space_id?: string
-        }
-      | undefined
-
-    if (blockValue?.parent_table !== 'collection') {
-      throw new Error(`Block ${rowId} is not a database row. Only database rows can be updated with update-row.`)
-    }
-
-    const collectionId = blockValue.parent_id as string | undefined
-    const spaceId = blockValue.space_id as string | undefined
-
-    if (!collectionId || !spaceId) {
-      throw new Error(`Could not resolve collection or space for row: ${rowId}`)
-    }
-
-    const collection = await fetchCollection(creds.token_v2, collectionId)
-    const schema = collection.schema ?? {}
-
-    const nameToId: Record<string, string> = {}
-    for (const [propId, prop] of Object.entries(schema)) {
-      nameToId[prop.name] = propId
-    }
-
-    const parsed = JSON.parse(options.properties) as Record<string, unknown>
-    if (Object.keys(parsed).length === 0) {
-      throw new Error('No properties to update. Provide --properties with at least one property name and value.')
-    }
-
-    const optionValuesToRegister: Record<string, string[]> = {}
-    const registerOption = (propId: string, value: string) => {
-      const schemaEntry = schema[propId]
-      const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
-      const existsInSchema = existingOptions.some((option) => getOptionValue(option) === value)
-      if (existsInSchema) {
-        return
-      }
-
-      const pendingValues = optionValuesToRegister[propId] ?? []
-      if (!pendingValues.includes(value)) {
-        optionValuesToRegister[propId] = [...pendingValues, value]
-      }
-    }
-
-    const serializedProps = serializeRowProperties(parsed, schema, nameToId, registerOption)
-    const schemaOps = buildSchemaOptionUpdates(optionValuesToRegister, schema, collectionId, spaceId)
-
-    const operations = [
-      ...schemaOps,
-      ...Object.entries(serializedProps).map(([propId, value]) => ({
-        pointer: { table: 'block' as const, id: rowId, spaceId },
-        command: 'set' as const,
-        path: ['properties', propId],
-        args: value,
-      })),
-    ]
-
-    await internalRequest(creds.token_v2, 'saveTransactions', {
-      requestId: generateId(),
-      transactions: [{ id: generateId(), spaceId, operations }],
+    const result = await handleDatabaseUpdateRow(creds.token_v2, {
+      row_id: rawRowId,
+      properties: options.properties,
+      workspaceId: options.workspaceId,
     })
-
-    const updated = (await internalRequest(creds.token_v2, 'syncRecordValues', {
-      requests: [{ pointer: { table: 'block', id: rowId }, version: -1 }],
-    })) as { recordMap: { block: Record<string, Record<string, unknown>> } }
-
-    const updatedBlock = Object.values(updated.recordMap.block)[0]
-    console.log(formatOutput(formatBlockRecord(updatedBlock), options.pretty))
+    console.log(formatOutput(result, options.pretty))
   } catch (error) {
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)
@@ -1250,6 +939,379 @@ async function viewUpdateAction(rawViewId: string, options: ViewUpdateOptions): 
     console.error(JSON.stringify({ error: (error as Error).message }))
     process.exit(1)
   }
+}
+
+export async function handleDatabaseCreate(
+  tokenV2: string,
+  args: { parent: string; title: string; properties?: string; workspaceId: string },
+): Promise<unknown> {
+  const parent = formatNotionId(args.parent)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  const spaceId = await resolveSpaceId(tokenV2, parent)
+  const collId = generateId()
+  const viewId = generateId()
+  const blockId = generateId()
+  const parsedProperties = parseSchemaProperties(args.properties)
+  const mergedSchema: CollectionSchema = {
+    title: { name: 'Name', type: 'title' },
+    ...parsedProperties,
+  }
+  resolveRelationProperties(parsedProperties, mergedSchema, spaceId)
+  await resolveRollupReferences(parsedProperties, mergedSchema, tokenV2)
+
+  await internalRequest(tokenV2, 'saveTransactions', {
+    requestId: generateId(),
+    transactions: [
+      {
+        id: generateId(),
+        spaceId,
+        operations: [
+          {
+            pointer: { table: 'collection', id: collId, spaceId },
+            command: 'set',
+            path: [],
+            args: {
+              id: collId,
+              name: [[args.title]],
+              schema: mergedSchema,
+              parent_id: blockId,
+              parent_table: 'block',
+              alive: true,
+              space_id: spaceId,
+            },
+          },
+          {
+            pointer: { table: 'collection_view', id: viewId, spaceId },
+            command: 'set',
+            path: [],
+            args: {
+              id: viewId,
+              type: 'table',
+              name: 'Default view',
+              parent_id: blockId,
+              parent_table: 'block',
+              alive: true,
+              version: 1,
+            },
+          },
+          {
+            pointer: { table: 'block', id: blockId, spaceId },
+            command: 'set',
+            path: [],
+            args: {
+              type: 'collection_view_page',
+              id: blockId,
+              collection_id: collId,
+              view_ids: [viewId],
+              parent_id: parent,
+              parent_table: 'block',
+              alive: true,
+              space_id: spaceId,
+              version: 1,
+            },
+          },
+          {
+            pointer: { table: 'block', id: parent, spaceId },
+            command: 'listAfter',
+            path: ['content'],
+            args: { id: blockId },
+          },
+        ],
+      },
+    ],
+  })
+
+  const created = await fetchCollection(tokenV2, collId)
+  return formatCollectionValue(created as Record<string, unknown>)
+}
+
+export async function handleDatabaseUpdate(
+  tokenV2: string,
+  args: { database_id: string; title?: string; properties?: string; workspaceId: string },
+): Promise<unknown> {
+  const collectionId = formatNotionId(args.database_id)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  const current = await fetchCollection(tokenV2, collectionId)
+
+  if (!args.title && !args.properties) {
+    return formatCollectionValue(current as Record<string, unknown>)
+  }
+
+  const parentId = current.parent_id
+  if (!parentId) {
+    throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
+  }
+
+  const spaceId = await resolveSpaceId(tokenV2, parentId)
+  const updateArgs: {
+    name?: string[][]
+    schema?: CollectionSchema
+  } = {}
+
+  if (args.title) {
+    updateArgs.name = [[args.title]]
+  }
+
+  if (args.properties) {
+    const parsedProperties = parseSchemaProperties(args.properties)
+    const mergedSchema: CollectionSchema = {
+      ...(current.schema ?? {}),
+      ...parsedProperties,
+    }
+    resolveRelationProperties(parsedProperties, mergedSchema, spaceId)
+    await resolveRollupReferences(parsedProperties, mergedSchema, tokenV2)
+    updateArgs.schema = mergedSchema
+  }
+
+  await internalRequest(tokenV2, 'saveTransactions', {
+    requestId: generateId(),
+    transactions: [
+      {
+        id: generateId(),
+        spaceId,
+        operations: [
+          {
+            pointer: { table: 'collection', id: collectionId, spaceId },
+            command: 'update',
+            path: [],
+            args: updateArgs,
+          },
+        ],
+      },
+    ],
+  })
+
+  const updated = await fetchCollection(tokenV2, collectionId)
+  return formatCollectionValue(updated as Record<string, unknown>)
+}
+
+export async function handleDatabaseDeleteProperty(
+  tokenV2: string,
+  args: { database_id: string; property: string; workspaceId: string },
+): Promise<unknown> {
+  const collectionId = formatNotionId(args.database_id)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  const current = await fetchCollection(tokenV2, collectionId)
+  const schema = current.schema ?? {}
+
+  const nameToId: Record<string, string> = {}
+  for (const [propId, prop] of Object.entries(schema)) {
+    if (prop.alive === false) continue
+    nameToId[prop.name] = propId
+  }
+
+  const propId = nameToId[args.property]
+  if (!propId) {
+    throw new Error(
+      `Unknown property: "${args.property}". Available: ${Object.values(schema)
+        .filter((p) => p.alive !== false)
+        .map((p) => p.name)
+        .join(', ')}`,
+    )
+  }
+
+  if (schema[propId].type === 'title') {
+    throw new Error('Cannot delete the title property')
+  }
+
+  const parentId = current.parent_id
+  if (!parentId) {
+    throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
+  }
+
+  const spaceId = await resolveSpaceId(tokenV2, parentId)
+
+  await internalRequest(tokenV2, 'saveTransactions', {
+    requestId: generateId(),
+    transactions: [
+      {
+        id: generateId(),
+        spaceId,
+        operations: [
+          {
+            pointer: { table: 'collection', id: collectionId, spaceId },
+            command: 'update',
+            path: ['schema', propId],
+            args: { name: `__deleted_${propId}_${Date.now()}`, alive: false },
+          },
+        ],
+      },
+    ],
+  })
+
+  const updated = await fetchCollection(tokenV2, collectionId)
+  return formatCollectionValue(updated as Record<string, unknown>)
+}
+
+export async function handleDatabaseAddRow(
+  tokenV2: string,
+  args: { database_id: string; title: string; properties?: string; workspaceId: string },
+): Promise<unknown> {
+  const collectionId = formatNotionId(args.database_id)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+
+  const collection = await fetchCollection(tokenV2, collectionId)
+  const parentBlockId = collection.parent_id
+  if (!parentBlockId) {
+    throw new Error(`Could not resolve parent block for collection: ${collectionId}`)
+  }
+  const spaceId = await resolveSpaceId(tokenV2, parentBlockId)
+
+  const schema = collection.schema ?? {}
+  const nameToId: Record<string, string> = {}
+  for (const [propId, prop] of Object.entries(schema)) {
+    nameToId[prop.name] = propId
+  }
+
+  const optionValuesToRegister: Record<string, string[]> = {}
+
+  const registerSchemaOptionValue = (propId: string, value: string) => {
+    const schemaEntry = schema[propId]
+    const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
+    const existsInSchema = existingOptions.some((option) => getOptionValue(option) === value)
+    if (existsInSchema) {
+      return
+    }
+
+    const pendingValues = optionValuesToRegister[propId] ?? []
+    if (!pendingValues.includes(value)) {
+      optionValuesToRegister[propId] = [...pendingValues, value]
+    }
+  }
+
+  const newRowId = generateId()
+  const properties: Record<string, unknown> = { title: [[args.title]] }
+
+  if (args.properties) {
+    const parsed = JSON.parse(args.properties) as Record<string, unknown>
+    Object.assign(properties, serializeRowProperties(parsed, schema, nameToId, registerSchemaOptionValue))
+  }
+
+  const viewId = await resolveCollectionViewId(tokenV2, collectionId)
+
+  const schemaUpdateOperations = buildSchemaOptionUpdates(optionValuesToRegister, schema, collectionId, spaceId)
+
+  const operations = [
+    ...schemaUpdateOperations,
+    {
+      pointer: { table: 'block' as const, id: newRowId, spaceId },
+      command: 'set' as const,
+      path: [] as string[],
+      args: {
+        type: 'page',
+        id: newRowId,
+        version: 1,
+        parent_id: collectionId,
+        parent_table: 'collection',
+        alive: true,
+        properties,
+        space_id: spaceId,
+      },
+    },
+    {
+      pointer: { table: 'collection_view' as const, id: viewId, spaceId },
+      command: 'listAfter' as const,
+      path: ['page_sort'],
+      args: { id: newRowId },
+    },
+  ]
+
+  await internalRequest(tokenV2, 'saveTransactions', {
+    requestId: generateId(),
+    transactions: [{ id: generateId(), spaceId, operations }],
+  })
+
+  const created = (await internalRequest(tokenV2, 'syncRecordValues', {
+    requests: [{ pointer: { table: 'block', id: newRowId }, version: -1 }],
+  })) as { recordMap: { block: Record<string, Record<string, unknown>> } }
+
+  const createdBlock = Object.values(created.recordMap.block)[0]
+  return formatBlockRecord(createdBlock)
+}
+
+export async function handleDatabaseUpdateRow(
+  tokenV2: string,
+  args: { row_id: string; properties: string; workspaceId: string },
+): Promise<unknown> {
+  const rowId = formatNotionId(args.row_id)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+
+  const rowResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
+    requests: [{ pointer: { table: 'block', id: rowId }, version: -1 }],
+  })) as SyncRecordValuesResponse
+
+  const rowRecord = rowResponse.recordMap?.block?.[rowId] ?? Object.values(rowResponse.recordMap?.block ?? {})[0]
+  const blockValue = rowRecord?.value as
+    | {
+        parent_table?: string
+        parent_id?: string
+        space_id?: string
+      }
+    | undefined
+
+  if (blockValue?.parent_table !== 'collection') {
+    throw new Error(`Block ${rowId} is not a database row. Only database rows can be updated with update-row.`)
+  }
+
+  const collectionId = blockValue.parent_id as string | undefined
+  const spaceId = blockValue.space_id as string | undefined
+
+  if (!collectionId || !spaceId) {
+    throw new Error(`Could not resolve collection or space for row: ${rowId}`)
+  }
+
+  const collection = await fetchCollection(tokenV2, collectionId)
+  const schema = collection.schema ?? {}
+
+  const nameToId: Record<string, string> = {}
+  for (const [propId, prop] of Object.entries(schema)) {
+    nameToId[prop.name] = propId
+  }
+
+  const parsed = JSON.parse(args.properties) as Record<string, unknown>
+  if (Object.keys(parsed).length === 0) {
+    throw new Error('No properties to update. Provide --properties with at least one property name and value.')
+  }
+
+  const optionValuesToRegister: Record<string, string[]> = {}
+  const registerOption = (propId: string, value: string) => {
+    const schemaEntry = schema[propId]
+    const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
+    const existsInSchema = existingOptions.some((option) => getOptionValue(option) === value)
+    if (existsInSchema) {
+      return
+    }
+
+    const pendingValues = optionValuesToRegister[propId] ?? []
+    if (!pendingValues.includes(value)) {
+      optionValuesToRegister[propId] = [...pendingValues, value]
+    }
+  }
+
+  const serializedProps = serializeRowProperties(parsed, schema, nameToId, registerOption)
+  const schemaOps = buildSchemaOptionUpdates(optionValuesToRegister, schema, collectionId, spaceId)
+
+  const operations = [
+    ...schemaOps,
+    ...Object.entries(serializedProps).map(([propId, value]) => ({
+      pointer: { table: 'block' as const, id: rowId, spaceId },
+      command: 'set' as const,
+      path: ['properties', propId],
+      args: value,
+    })),
+  ]
+
+  await internalRequest(tokenV2, 'saveTransactions', {
+    requestId: generateId(),
+    transactions: [{ id: generateId(), spaceId, operations }],
+  })
+
+  const updated = (await internalRequest(tokenV2, 'syncRecordValues', {
+    requests: [{ pointer: { table: 'block', id: rowId }, version: -1 }],
+  })) as { recordMap: { block: Record<string, Record<string, unknown>> } }
+
+  const updatedBlock = Object.values(updated.recordMap.block)[0]
+  return formatBlockRecord(updatedBlock)
 }
 
 export const databaseCommand = new Command('database')
