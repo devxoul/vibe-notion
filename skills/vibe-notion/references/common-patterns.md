@@ -119,3 +119,47 @@ vibe-notion block children <block_id> --workspace-id <workspace_id> --start-curs
 # Search uses offset-based pagination — pass next_cursor number from previous response
 vibe-notion search "query" --workspace-id <workspace_id> --start-cursor 20
 ```
+
+## 8. Batch Operations (Multiple Writes in One Call)
+
+When you need to perform multiple write operations, use `batch` instead of calling the CLI once per action. This is especially useful for populating databases, setting up page structures, or making coordinated changes.
+
+### Adding multiple rows to a database
+
+```bash
+vibe-notion batch --workspace-id <workspace_id> '[
+  {"action": "database.add-row", "database_id": "<db_id>", "title": "Task 1", "properties": {"Status": "To Do", "Priority": "High"}},
+  {"action": "database.add-row", "database_id": "<db_id>", "title": "Task 2", "properties": {"Status": "To Do", "Priority": "Medium"}},
+  {"action": "database.add-row", "database_id": "<db_id>", "title": "Task 3", "properties": {"Status": "In Progress"}}
+]'
+```
+
+### Creating a page and appending content in one call
+
+```bash
+vibe-notion batch --workspace-id <workspace_id> '[
+  {"action": "page.create", "parent": "<parent_id>", "title": "Weekly Report"},
+  {"action": "block.append", "parent_id": "<new_page_id>", "markdown": "# Summary\n\nAll tasks completed on time."}
+]'
+```
+
+> **Note**: The second operation needs the page ID from the first. Since batch runs sequentially and you won't know the ID ahead of time, split this into two calls: one `page create` to get the ID, then a `batch` for the remaining operations. Batch is most useful when operations are independent or you already have all IDs.
+
+### Updating multiple rows at once
+
+```bash
+vibe-notion batch --workspace-id <workspace_id> '[
+  {"action": "database.update-row", "row_id": "<row_1>", "properties": {"Status": "Done"}},
+  {"action": "database.update-row", "row_id": "<row_2>", "properties": {"Status": "Done"}},
+  {"action": "database.update-row", "row_id": "<row_3>", "properties": {"Status": "Cancelled"}}
+]'
+```
+
+### Using a file for large payloads
+
+When the JSON is too large for a shell argument, write it to a file first:
+
+```bash
+# Write operations to a file, then pass it
+vibe-notion batch --workspace-id <workspace_id> --file ./operations.json ''
+```

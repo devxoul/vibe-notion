@@ -174,6 +174,72 @@ vibe-notionbot comment create "Replying to thread" --discussion <discussion_id>
 vibe-notionbot comment get <comment_id>
 ```
 
+### Batch Command
+
+Run multiple write operations in a single CLI call. Use this instead of calling the CLI repeatedly when you need to create, update, or delete multiple things at once. Saves tokens and reduces round-trips.
+
+```bash
+# Inline JSON (no --workspace-id needed, uses NOTION_TOKEN)
+vibe-notionbot batch '<operations_json>'
+
+# From file (for large payloads)
+vibe-notionbot batch --file ./operations.json '<ignored>'
+```
+
+**Supported actions** (10 total):
+
+| Action | Description |
+|--------|-------------|
+| `page.create` | Create a page |
+| `page.update` | Update page properties |
+| `page.archive` | Archive a page |
+| `block.append` | Append blocks to a parent |
+| `block.update` | Update a block |
+| `block.delete` | Delete a block |
+| `comment.create` | Create a comment |
+| `database.create` | Create a database |
+| `database.update` | Update database title or schema |
+| `database.delete-property` | Delete a database property |
+
+**Operation format**: Each operation is an object with `action` plus the same fields you'd pass to the individual command handler. Example with mixed actions:
+
+```json
+[
+  {"action": "page.create", "parent": "<parent_id>", "title": "Meeting Notes"},
+  {"action": "block.append", "parent_id": "<page_id>", "markdown": "# Agenda\n\n- Item 1\n- Item 2"},
+  {"action": "comment.create", "content": "Page created via batch", "page": "<page_id>"}
+]
+```
+
+**Output format**:
+
+```json
+{
+  "results": [
+    {"index": 0, "action": "page.create", "success": true, "data": {"id": "page-uuid", "...": "..."}},
+    {"index": 1, "action": "block.append", "success": true, "data": {"...": "..."}},
+    {"index": 2, "action": "comment.create", "success": true, "data": {"id": "comment-uuid", "...": "..."}}
+  ],
+  "total": 3,
+  "succeeded": 3,
+  "failed": 0
+}
+```
+
+**Fail-fast behavior**: Operations run sequentially. If any operation fails, execution stops immediately. The output will contain results for all completed operations plus the failed one. The process exits with code 1 on failure, 0 on success.
+
+```json
+{
+  "results": [
+    {"index": 0, "action": "page.create", "success": true, "data": {"...": "..."}},
+    {"index": 1, "action": "block.append", "success": false, "error": "Block not found"}
+  ],
+  "total": 3,
+  "succeeded": 1,
+  "failed": 1
+}
+```
+
 ## Output Format
 
 ### JSON (Default)
