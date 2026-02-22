@@ -2848,21 +2848,20 @@ describe('database delete-property', () => {
       console.log = originalLog
     }
 
-    // Then — saveTransactions updates the collection with schema excluding the deleted property
+    // Then — saveTransactions moves prop to deleted_schema then nulls it in schema
     const saveCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
-    const operation = (saveCall?.[2] as any).transactions[0].operations[0]
-    expect(operation.command).toBe('update')
-    expect(operation.path).toEqual([])
-    expect(operation.args).toEqual({
-      schema: {
-        title: { name: 'Name', type: 'title' },
-        prop2: { name: 'Priority', type: 'select' },
-      },
-    })
-    expect(operation.args.schema.prop1).toBeUndefined()
+    const operations = (saveCall?.[2] as any).transactions[0].operations
+    // First op: move to deleted_schema
+    expect(operations[0].command).toBe('update')
+    expect(operations[0].path).toEqual(['deleted_schema'])
+    expect(operations[0].args).toEqual({ prop1: { name: 'Status', type: 'select' } })
+    // Second op: null out in schema
+    expect(operations[1].command).toBe('update')
+    expect(operations[1].path).toEqual(['schema'])
+    expect(operations[1].args).toEqual({ prop1: null })
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])
@@ -3090,9 +3089,13 @@ describe('database delete-property', () => {
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
-    const operation = (saveCall?.[2] as any).transactions[0].operations[0]
-    expect(operation.args.schema.new_prop).toBeUndefined()
-    expect(operation.args.schema.old_prop).toEqual({ name: 'Status', type: 'select', alive: false })
+    const operations = (saveCall?.[2] as any).transactions[0].operations
+    // First op: move to deleted_schema
+    expect(operations[0].path).toEqual(['deleted_schema'])
+    expect(operations[0].args).toEqual({ new_prop: { name: 'Status', type: 'multi_select' } })
+    // Second op: null out in schema
+    expect(operations[1].path).toEqual(['schema'])
+    expect(operations[1].args).toEqual({ new_prop: null })
   })
 
   test('preserves other properties when deleting one', async () => {
@@ -3178,19 +3181,18 @@ describe('database delete-property', () => {
       console.log = originalLog
     }
 
-    // Then — schema sent to API should have all properties except the deleted one
+    // Then — should move prop2 to deleted_schema and null it in schema
     const saveCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
-    const operation = (saveCall?.[2] as any).transactions[0].operations[0]
-    expect(operation.args).toEqual({
-      schema: {
-        title: { name: 'Name', type: 'title' },
-        prop1: { name: 'Status', type: 'select' },
-        prop3: { name: 'Due Date', type: 'date' },
-      },
-    })
+    const operations = (saveCall?.[2] as any).transactions[0].operations
+    // First op: move to deleted_schema
+    expect(operations[0].path).toEqual(['deleted_schema'])
+    expect(operations[0].args).toEqual({ prop2: { name: 'Priority', type: 'select' } })
+    // Second op: null out in schema
+    expect(operations[1].path).toEqual(['schema'])
+    expect(operations[1].args).toEqual({ prop2: null })
   })
 })
 
