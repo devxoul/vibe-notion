@@ -392,9 +392,12 @@ describe('Notion E2E Tests', () => {
       ])
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; schema: Record<string, { type: string }> }>(result.stdout)
+      const data = parseJSON<{ id: string; schema: Record<string, { type: string }>; $hints?: string[] }>(result.stdout)
       expect(data?.id).toBe(createdDbId)
       expect(data?.schema?.['E2E Prop']).toBeUndefined()
+
+      const softDeleteHints = (data?.$hints ?? []).filter((h) => h.includes('soft-deleted'))
+      expect(softDeleteHints).toEqual([])
 
       await waitForRateLimit()
     }, 30000)
@@ -457,13 +460,16 @@ describe('Notion E2E Tests', () => {
       const getResult = await runNotionCLI(['database', 'get', '--workspace-id', workspaceId, dbId])
       expect(getResult.exitCode).toBe(0)
 
-      const final = parseJSON<{ id: string; schema: Record<string, { type: string }> }>(getResult.stdout)
+      const final = parseJSON<{ id: string; schema: Record<string, { type: string }>; $hints?: string[] }>(getResult.stdout)
       expect(final?.schema?.[propName]?.type).toBe('text')
 
       const suffixedKeys = Object.keys(final?.schema ?? {}).filter(
         (k) => k.startsWith(propName) && k !== propName,
       )
       expect(suffixedKeys).toEqual([])
+
+      const softDeleteHints = (final?.$hints ?? []).filter((h) => h.includes('soft-deleted'))
+      expect(softDeleteHints).toEqual([])
 
       await waitForRateLimit()
     }, 60000)
@@ -538,11 +544,14 @@ describe('Notion E2E Tests', () => {
       // then
       expect(result.exitCode).toBe(0)
 
-      const data = parseJSON<{ id: string; schema: Record<string, { type: string }> }>(result.stdout)
+      const data = parseJSON<{ id: string; schema: Record<string, { type: string }>; $hints?: string[] }>(result.stdout)
       expect(data?.id).toBe(tgtDbId)
       expect(data?.schema?.['PRD Rollup']).toBeUndefined()
       expect(data?.schema?.['Source Rel']?.type).toBe('relation')
       expect(data?.schema?.['Name']?.type).toBe('title')
+
+      const softDeleteHints = (data?.$hints ?? []).filter((h) => h.includes('soft-deleted'))
+      expect(softDeleteHints).toEqual([])
 
       await waitForRateLimit()
     }, 60000)

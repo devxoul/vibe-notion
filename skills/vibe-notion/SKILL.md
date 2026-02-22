@@ -1,7 +1,17 @@
 ---
 name: vibe-notion
 description: Interact with Notion using the unofficial private API - pages, databases, blocks, search, users, comments
+version: 0.5.0
 allowed-tools: Bash(vibe-notion:*)
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - vibe-notion
+    install:
+      - kind: node
+        package: vibe-notion
+        bins: [vibe-notion]
 ---
 
 # Vibe Notion

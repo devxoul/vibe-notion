@@ -40,13 +40,26 @@ jobs:
         run: bun run test
 
       - name: Bump version
-        run: npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
+        run: |
+          npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
+          bun -e "
+            const fs = require('fs');
+            const v = '${{ inputs.version }}';
+            for (const dir of fs.readdirSync('skills')) {
+              const p = 'skills/' + dir + '/SKILL.md';
+              if (fs.existsSync(p)) {
+                let s = fs.readFileSync(p, 'utf8');
+                s = s.replace(/^version: .+$/m, 'version: ' + v);
+                fs.writeFileSync(p, s);
+              }
+            }
+          "
 
       - name: Commit and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json
+          git add package.json skills/*/SKILL.md
           git diff --staged --quiet || git commit -m "${{ inputs.version }}"
           git tag "${{ inputs.version }}"
           git push origin HEAD --tags
@@ -58,3 +71,17 @@ jobs:
         run: gh release create "${{ inputs.version }}" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Publish to ClawHub
+        run: |
+          npx clawhub@latest login --token "$CLAWHUB_TOKEN" --no-browser
+          for skill_dir in skills/*/; do
+            slug=$(basename "$skill_dir")
+            npx clawhub@latest publish "$skill_dir" \
+              --slug "$slug" \
+              --version "${{ inputs.version }}" \
+              --tags latest \
+              --no-input
+          done
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}

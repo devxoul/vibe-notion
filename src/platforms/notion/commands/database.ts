@@ -1121,6 +1121,9 @@ export async function handleDatabaseDeleteProperty(
 
   const spaceId = await resolveSpaceId(tokenV2, parentId)
 
+  const newSchema = { ...schema }
+  delete newSchema[propId]
+
   await internalRequest(tokenV2, 'saveTransactions', {
     requestId: generateId(),
     transactions: [
@@ -1130,9 +1133,9 @@ export async function handleDatabaseDeleteProperty(
         operations: [
           {
             pointer: { table: 'collection', id: collectionId, spaceId },
-            command: 'update',
-            path: ['schema', propId],
-            args: { name: `__deleted_${propId}_${Date.now()}`, alive: false },
+            command: 'set',
+            path: ['schema'],
+            args: newSchema,
           },
         ],
       },

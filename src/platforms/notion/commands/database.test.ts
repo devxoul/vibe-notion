@@ -2848,16 +2848,19 @@ describe('database delete-property', () => {
       console.log = originalLog
     }
 
-    // Then — saveTransactions renames and soft-deletes the property to avoid name collisions
+    // Then — saveTransactions sets the full schema without the deleted property
     const saveCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
     const operation = (saveCall?.[2] as any).transactions[0].operations[0]
-    expect(operation.command).toBe('update')
-    expect(operation.path).toEqual(['schema', 'prop1'])
-    expect(operation.args.alive).toBe(false)
-    expect(operation.args.name).toMatch(/^__deleted_prop1_\d+$/)
+    expect(operation.command).toBe('set')
+    expect(operation.path).toEqual(['schema'])
+    expect(operation.args).toEqual({
+      title: { name: 'Name', type: 'title' },
+      prop2: { name: 'Priority', type: 'select' },
+    })
+    expect(operation.args.prop1).toBeUndefined()
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])
@@ -2997,6 +3000,193 @@ describe('database delete-property', () => {
     // Then
     expect(errors.length).toBeGreaterThan(0)
     expect(errors[0]).toContain('Cannot delete the title property')
+  })
+
+  test('skips alive:false properties when resolving name', async () => {
+    mock.restore()
+    // Given — schema has a dead property with the same name as a live one
+    const mockGetResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                old_prop: { name: 'Status', type: 'select', alive: false },
+                new_prop: { name: 'Status', type: 'multi_select' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockUpdatedResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                old_prop: { name: 'Status', type: 'select', alive: false },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+
+    let callCount = 0
+    const mockInternalRequest = mock(() => {
+      callCount++
+      if (callCount === 1) return Promise.resolve(mockGetResponse)
+      if (callCount === 2) return Promise.resolve({})
+      return Promise.resolve(mockUpdatedResponse)
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['delete-property', 'coll-1', '--workspace-id', 'space-123', '--property', 'Status'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then — should target new_prop (live), not old_prop (dead)
+    const saveCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveCall).toBeDefined()
+    const operation = (saveCall?.[2] as any).transactions[0].operations[0]
+    expect(operation.args.new_prop).toBeUndefined()
+    expect(operation.args.old_prop).toEqual({ name: 'Status', type: 'select', alive: false })
+  })
+
+  test('preserves other properties when deleting one', async () => {
+    mock.restore()
+    // Given — schema with multiple properties
+    const mockGetResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+                prop2: { name: 'Priority', type: 'select' },
+                prop3: { name: 'Due Date', type: 'date' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+    const mockUpdatedResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              name: [['Test DB']],
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: { name: 'Status', type: 'select' },
+                prop3: { name: 'Due Date', type: 'date' },
+              },
+              parent_id: 'block-1',
+              alive: true,
+              space_id: 'space-123',
+            },
+          },
+        },
+      },
+    }
+
+    let callCount = 0
+    const mockInternalRequest = mock(() => {
+      callCount++
+      if (callCount === 1) return Promise.resolve(mockGetResponse)
+      if (callCount === 2) return Promise.resolve({})
+      return Promise.resolve(mockUpdatedResponse)
+    })
+    const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token' }))
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-123'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['delete-property', 'coll-1', '--workspace-id', 'space-123', '--property', 'Priority'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then — schema sent to API should have all properties except the deleted one
+    const saveCall = mockInternalRequest.mock.calls.find(
+      (call) => (call as unknown[])[1] === 'saveTransactions',
+    ) as unknown as [string, string, Record<string, unknown>] | undefined
+    expect(saveCall).toBeDefined()
+    const operation = (saveCall?.[2] as any).transactions[0].operations[0]
+    expect(operation.args).toEqual({
+      title: { name: 'Name', type: 'title' },
+      prop1: { name: 'Status', type: 'select' },
+      prop3: { name: 'Due Date', type: 'date' },
+    })
   })
 })
 
