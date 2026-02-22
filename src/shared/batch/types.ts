@@ -49,6 +49,22 @@ export const NOTIONBOT_ACTIONS: string[] = [
   'database.delete-property',
 ]
 
+// Batch JSON input parses nested objects (e.g. `properties: {Status: "P0"}`) into
+// JS objects, but handlers expect CLI-style string args and call JSON.parse internally.
+// Re-stringify any non-primitive values so handlers receive the same format as CLI input.
+export function normalizeOperationArgs(operation: BatchOperation): Record<string, unknown> {
+  const args: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(operation)) {
+    if (key === 'action') continue
+    if (value !== null && typeof value === 'object') {
+      args[key] = JSON.stringify(value)
+    } else {
+      args[key] = value
+    }
+  }
+  return args
+}
+
 export function validateOperations(operations: unknown[], validActions: string[]): void {
   if (!Array.isArray(operations)) {
     throw new Error('Operations must be an array')

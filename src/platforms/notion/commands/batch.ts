@@ -6,6 +6,7 @@ import {
   type BatchOutput,
   type BatchResult,
   type NotionHandler,
+  normalizeOperationArgs,
   validateOperations,
 } from '@/shared/batch/types'
 import { formatOutput } from '@/shared/utils/output'
@@ -106,7 +107,8 @@ export async function executeBatch(operationsArg: string | undefined, options: B
     }
 
     try {
-      const data = await handler(creds.token_v2, { ...operation, workspaceId: options.workspaceId })
+      const args = { ...normalizeOperationArgs(operation), workspaceId: options.workspaceId }
+      const data = await handler(creds.token_v2, args)
       results.push({ index, action, success: true, data })
     } catch (error) {
       results.push({
