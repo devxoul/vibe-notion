@@ -2317,6 +2317,195 @@ describe('database update-row', () => {
     expect(output.length).toBeGreaterThan(0)
   })
 
+  test('update-row with date range uses type "daterange"', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                due1: { name: 'Due', type: 'date' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        [
+          'update-row',
+          'row-1',
+          '--workspace-id',
+          'space-1',
+          '--properties',
+          '{"Due":{"start":"2026-01-01","end":"2026-01-15"}}',
+        ],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) throw new Error('Expected saveTransactions call')
+
+    const operations = saveCall[2].transactions[0].operations
+    const dateOp = operations.find((op) => Array.isArray(op.path) && (op.path as string[]).includes('due1'))
+    expect(dateOp).toBeDefined()
+    expect(dateOp?.args).toEqual([
+      ['‣', [['d', { type: 'daterange', start_date: '2026-01-01', end_date: '2026-01-15' }]]],
+    ])
+  })
+
+  test('update-row with date (no end) uses type "date"', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                due1: { name: 'Due', type: 'date' },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"Due":{"start":"2026-01-01"}}'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) throw new Error('Expected saveTransactions call')
+
+    const operations = saveCall[2].transactions[0].operations
+    const dateOp = operations.find((op) => Array.isArray(op.path) && (op.path as string[]).includes('due1'))
+    expect(dateOp).toBeDefined()
+    expect(dateOp?.args).toEqual([['‣', [['d', { type: 'date', start_date: '2026-01-01' }]]]])
+  })
+
   test('update-row throws on unknown property name', async () => {
     mock.restore()
     // Given

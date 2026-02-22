@@ -346,7 +346,7 @@ function serializeRowProperties(
     } else if (propType === 'date') {
       const dateValue = value as { start: string; end?: string }
       const dateArgs: Record<string, string> = {
-        type: 'date',
+        type: dateValue.end ? 'daterange' : 'date',
         start_date: dateValue.start,
       }
       if (dateValue.end) {

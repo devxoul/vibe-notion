@@ -199,10 +199,14 @@ vibe-notion database update <database_id> --workspace-id <workspace_id> --title 
 vibe-notion database add-row <database_id> --workspace-id <workspace_id> --title "Row title" --pretty
 vibe-notion database add-row <database_id> --workspace-id <workspace_id> --title "Row title" --properties '{"Status":"In Progress","Due":{"start":"2025-03-01"}}' --pretty
 
+# Add row with date range
+vibe-notion database add-row <database_id> --workspace-id <workspace_id> --title "Event" --properties '{"Due":{"start":"2026-01-01","end":"2026-01-15"}}' --pretty
+
 # Update properties on an existing database row (row_id from database query)
 vibe-notion database update-row <row_id> --workspace-id <workspace_id> --properties '{"Status":"Done"}' --pretty
 vibe-notion database update-row <row_id> --workspace-id <workspace_id> --properties '{"Priority":"High","Tags":["backend","infra"]}' --pretty
 vibe-notion database update-row <row_id> --workspace-id <workspace_id> --properties '{"Due":{"start":"2026-06-01"},"Status":"In Progress"}' --pretty
+vibe-notion database update-row <row_id> --workspace-id <workspace_id> --properties '{"Due":{"start":"2026-01-01","end":"2026-01-15"}}' --pretty
 vibe-notion database update-row <row_id> --workspace-id <workspace_id> --properties '{"Related":["<target_row_id>"]}' --pretty
 
 # Delete a property from a database (cannot delete the title property)
