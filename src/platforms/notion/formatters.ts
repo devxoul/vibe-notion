@@ -6,7 +6,7 @@ export type PropertyValue =
   | { type: 'number'; value: number | null }
   | { type: 'select'; value: string }
   | { type: 'multi_select'; value: string[] }
-  | { type: 'date'; value: string | null }
+  | { type: 'date'; value: { start: string; end?: string } | null }
   | { type: 'person'; value: string[] | Array<{ id: string; name: string }> }
   | { type: 'relation'; value: string[] | Array<{ id: string; title: string }> }
   | { type: 'rollup'; value: unknown }
@@ -723,8 +723,12 @@ function extractPropertyText(value: unknown): string {
         if (!Array.isArray(deco) || deco.length < 2) continue
         const [marker, val] = deco
         if (marker === 'd' && val && typeof val === 'object' && !Array.isArray(val)) {
-          const dateStr = toOptionalString((val as Record<string, unknown>).start_date)
-          if (dateStr) parts.push(dateStr)
+          const dateObj = val as Record<string, unknown>
+          const dateStr = toOptionalString(dateObj.start_date)
+          if (dateStr) {
+            const endDateStr = toOptionalString(dateObj.end_date)
+            parts.push(endDateStr ? `${dateStr} → ${endDateStr}` : dateStr)
+          }
         } else if ((marker === 'u' || marker === 'p') && typeof val === 'string') {
           parts.push(val)
         }
@@ -830,7 +834,7 @@ function extractChecked(block: Record<string, unknown>): boolean {
   return extractPropertyText(properties.checked) === 'Yes'
 }
 
-function extractDateValue(value: unknown): string | null {
+function extractDateValue(value: unknown): { start: string; end?: string } | null {
   if (!Array.isArray(value)) return null
 
   for (const segment of value) {
@@ -840,8 +844,11 @@ function extractDateValue(value: unknown): string | null {
     for (const deco of segment[1]) {
       if (!Array.isArray(deco) || deco.length < 2) continue
       if (deco[0] === 'd' && deco[1] && typeof deco[1] === 'object' && !Array.isArray(deco[1])) {
-        const dateStr = toOptionalString((deco[1] as Record<string, unknown>).start_date)
-        if (dateStr) return dateStr
+        const dateObj = deco[1] as Record<string, unknown>
+        const start = toOptionalString(dateObj.start_date)
+        if (!start) continue
+        const end = toOptionalString(dateObj.end_date)
+        return end ? { start, end } : { start }
       }
     }
   }

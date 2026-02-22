@@ -933,7 +933,60 @@ describe('formatQueryCollectionResponse', () => {
           properties: {
             담당자: { type: 'person', value: ['user-123'] },
             연결: { type: 'relation', value: ['page-456'] },
-            일자: { type: 'date', value: '2026-01-01' },
+            일자: { type: 'date', value: { start: '2026-01-01' } },
+          },
+        },
+      ],
+      has_more: false,
+      next_cursor: null,
+    })
+  })
+
+  test('extracts date range with end_date', () => {
+    // Given
+    const response = {
+      result: {
+        reducerResults: {
+          collection_group_results: {
+            blockIds: ['row-1'],
+            hasMore: false,
+          },
+        },
+      },
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              properties: {
+                dateKey: [['‣', [['d', { start_date: '2026-01-01', end_date: '2026-01-15' }]]]],
+              },
+            },
+          },
+        },
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                dateKey: { name: '일자', type: 'date' },
+              },
+            },
+          },
+        },
+      },
+    }
+
+    // When
+    const result = formatQueryCollectionResponse(response)
+
+    // Then
+    expect(result).toEqual({
+      results: [
+        {
+          id: 'row-1',
+          properties: {
+            일자: { type: 'date', value: { start: '2026-01-01', end: '2026-01-15' } },
           },
         },
       ],
