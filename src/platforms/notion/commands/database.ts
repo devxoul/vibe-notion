@@ -1133,9 +1133,9 @@ export async function handleDatabaseDeleteProperty(
         operations: [
           {
             pointer: { table: 'collection', id: collectionId, spaceId },
-            command: 'set',
-            path: ['schema'],
-            args: newSchema,
+            command: 'update',
+            path: [],
+            args: { schema: newSchema },
           },
         ],
       },

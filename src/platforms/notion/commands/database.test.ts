@@ -2848,19 +2848,21 @@ describe('database delete-property', () => {
       console.log = originalLog
     }
 
-    // Then — saveTransactions sets the full schema without the deleted property
+    // Then — saveTransactions updates the collection with schema excluding the deleted property
     const saveCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
     const operation = (saveCall?.[2] as any).transactions[0].operations[0]
-    expect(operation.command).toBe('set')
-    expect(operation.path).toEqual(['schema'])
+    expect(operation.command).toBe('update')
+    expect(operation.path).toEqual([])
     expect(operation.args).toEqual({
-      title: { name: 'Name', type: 'title' },
-      prop2: { name: 'Priority', type: 'select' },
+      schema: {
+        title: { name: 'Name', type: 'title' },
+        prop2: { name: 'Priority', type: 'select' },
+      },
     })
-    expect(operation.args.prop1).toBeUndefined()
+    expect(operation.args.schema.prop1).toBeUndefined()
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])
@@ -3089,8 +3091,8 @@ describe('database delete-property', () => {
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveCall).toBeDefined()
     const operation = (saveCall?.[2] as any).transactions[0].operations[0]
-    expect(operation.args.new_prop).toBeUndefined()
-    expect(operation.args.old_prop).toEqual({ name: 'Status', type: 'select', alive: false })
+    expect(operation.args.schema.new_prop).toBeUndefined()
+    expect(operation.args.schema.old_prop).toEqual({ name: 'Status', type: 'select', alive: false })
   })
 
   test('preserves other properties when deleting one', async () => {
@@ -3183,9 +3185,11 @@ describe('database delete-property', () => {
     expect(saveCall).toBeDefined()
     const operation = (saveCall?.[2] as any).transactions[0].operations[0]
     expect(operation.args).toEqual({
-      title: { name: 'Name', type: 'title' },
-      prop1: { name: 'Status', type: 'select' },
-      prop3: { name: 'Due Date', type: 'date' },
+      schema: {
+        title: { name: 'Name', type: 'title' },
+        prop1: { name: 'Status', type: 'select' },
+        prop3: { name: 'Due Date', type: 'date' },
+      },
     })
   })
 })
