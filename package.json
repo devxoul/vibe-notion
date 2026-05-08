@@ -32,11 +32,13 @@
   "dependencies": {
     "@notionhq/client": "latest",
     "@tryfabric/martian": "^1.2.4",
-    "better-sqlite3": "latest",
     "commander": "latest",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "unified": "^11.0.5"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "latest"
   },
   "devDependencies": {
     "@types/better-sqlite3": "latest",

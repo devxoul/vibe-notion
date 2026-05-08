@@ -1,13 +1,11 @@
 import { execSync } from 'node:child_process'
 import { createDecipheriv, pbkdf2Sync } from 'node:crypto'
 import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { openSqlite } from '@/platforms/notion/sqlite'
 import type { ExtractedToken } from '@/platforms/notion/token-extractor'
-
-const require = createRequire(import.meta.url)
 
 interface BrowserConfig {
   name: string
@@ -31,18 +29,6 @@ type CookieRow = {
 type ExtractedBrowserTokenCandidate = {
   extracted: ExtractedToken
   lastAccessUtc: number
-}
-
-type BetterSqlite3Database = {
-  prepare(sql: string): {
-    get(...params: unknown[]): unknown
-    all(...params: unknown[]): unknown[]
-  }
-  close(): void
-}
-
-type BetterSqlite3Constructor = {
-  new (path: string, options?: Record<string, unknown>): BetterSqlite3Database
 }
 
 const BROWSERS: BrowserConfig[] = [
@@ -284,21 +270,11 @@ export class BrowserTokenExtractor {
       `
       const params = [...NOTION_HOST_KEYS, ...NOTION_COOKIE_NAMES]
 
+      const db = openSqlite(dbPath)
       let rows: CookieRow[]
-      if (typeof globalThis.Bun !== 'undefined') {
-        const { Database } = require('bun:sqlite')
-        const db = new Database(dbPath, { readonly: true })
-        rows = db.query(sql).all(...params) as CookieRow[]
-        db.close()
-      } else {
-        let Database: BetterSqlite3Constructor
-        try {
-          Database = require('better-sqlite3')
-        } catch {
-          throw new Error('better-sqlite3 is required for Node.js. Install it with: npm install better-sqlite3')
-        }
-        const db = new Database(dbPath, { readonly: true })
-        rows = db.prepare(sql).all(...params) as CookieRow[]
+      try {
+        rows = db.all(sql, ...params) as CookieRow[]
+      } finally {
         db.close()
       }
 
@@ -306,7 +282,7 @@ export class BrowserTokenExtractor {
 
       return this.buildCandidatesFromRows(rows, originalPath)
     } catch (error) {
-      if (error instanceof Error && error.message.includes('better-sqlite3')) {
+      if (error instanceof Error && error.message.startsWith('SQLite is required')) {
         throw error
       }
       this.extractionErrors.push(`readTokenFromDb: ${(error as Error).message}`)

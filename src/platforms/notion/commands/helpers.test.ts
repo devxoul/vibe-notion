@@ -645,11 +645,15 @@ describe('getCredentialsOrThrow', () => {
     _mockGetCredentials = mock(() => Promise.resolve(null))
     _mockAppExtract = mock(() => Promise.reject(new Error('Notion directory not found')))
     _mockBrowserExtract = mock(() =>
-      Promise.reject(new Error('better-sqlite3 is required for Node.js. Install it with: npm install better-sqlite3')),
+      Promise.reject(
+        new Error(
+          'SQLite is required for Node.js. Use Node.js 22+ (which includes node:sqlite), or install better-sqlite3: npm install better-sqlite3',
+        ),
+      ),
     )
 
     await expect(getCredentialsOrThrow()).rejects.toThrow(
-      'Auto-extraction failed: better-sqlite3 is required for Node.js. Install it with: npm install better-sqlite3',
+      'Auto-extraction failed: SQLite is required for Node.js. Use Node.js 22+ (which includes node:sqlite), or install better-sqlite3: npm install better-sqlite3',
     )
   })
 })
