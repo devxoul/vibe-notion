@@ -203,7 +203,9 @@ async function getAction(rawBlockId: string, options: BlockGetOptions): Promise<
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, blockId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
     const response = (await internalRequest(ctx.tokenV2, 'syncRecordValues', {
       requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
     })) as SyncRecordValuesResponse
@@ -244,7 +246,9 @@ async function childrenAction(rawBlockId: string, options: ChildListOptions): Pr
     const cursor = parsePageChunkCursor(options.startCursor)
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, blockId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
     const response = (await internalRequest(ctx.tokenV2, 'loadPageChunk', {
       pageId: blockId,
       limit: options.limit ? Number(options.limit) : 100,
