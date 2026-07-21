@@ -34,6 +34,7 @@ import {
   resolveBacklinkUsers,
   resolveDefaultTeamId,
   resolveSpaceId,
+  type WorkspaceSource,
 } from './helpers'
 
 type WorkspaceOptions = CommandOptions & { workspaceId?: string }
@@ -256,7 +257,9 @@ async function getAction(rawPageId: string, options: LoadPageChunkOptions): Prom
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, pageId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     let cursor: { stack: unknown[] } = { stack: [] }
     let chunkNumber = 0
@@ -591,10 +594,12 @@ async function updateAction(rawPageId: string, options: UpdatePageOptions): Prom
 
 export async function handlePageProperties(
   tokenV2: string,
-  args: { page_id: string; workspaceId: string },
+  args: { page_id: string; workspaceId: string; workspaceSource: WorkspaceSource },
 ): Promise<unknown> {
   const pageId = formatNotionId(args.page_id)
-  await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
+  await resolveAndSetActiveUserId(tokenV2, args.workspaceId, {
+    warnIfMissing: args.workspaceSource === 'explicit',
+  })
 
   const response = (await internalRequest(tokenV2, 'syncRecordValues', {
     requests: [{ pointer: { table: 'block', id: pageId }, version: -1 }],
@@ -661,6 +666,7 @@ async function propertiesAction(rawPageId: string, options: PropertiesOptions): 
     const result = await handlePageProperties(ctx.tokenV2, {
       page_id: pageId,
       workspaceId: ctx.workspaceId,
+      workspaceSource: ctx.workspaceSource,
     })
     console.log(formatOutput(result, options.pretty))
   } catch (error) {

@@ -288,7 +288,11 @@ function extractSpaceViewPointers(entry: SpaceUserEntry, userId: string): SpaceV
   return (inner?.space_view_pointers as SpaceViewPointer[]) ?? []
 }
 
-async function resolveAndSetActiveUserId(tokenV2: string, workspaceId?: string): Promise<void> {
+async function resolveAndSetActiveUserId(
+  tokenV2: string,
+  workspaceId?: string,
+  options: { warnIfMissing?: boolean } = {},
+): Promise<void> {
   if (!workspaceId) return
 
   if (!_capturedActiveUserId) {
@@ -315,6 +319,8 @@ async function resolveAndSetActiveUserId(tokenV2: string, workspaceId?: string):
       return
     }
   }
+
+  if (options.warnIfMissing === false) return
 
   const memberIds = Object.values(response).flatMap((entry) => (entry.space ? Object.keys(entry.space) : []))
   const allPointerIds = Object.entries(response).flatMap(([userId, entry]) =>
@@ -875,6 +881,28 @@ describe('resolveAndSetActiveUserId', () => {
     }
   })
 
+  test('suppresses the warning when warnIfMissing is false (public page)', async () => {
+    _mockInternalRequest = () =>
+      Promise.resolve({
+        'user-aaa': { space: { 'workspace-111': {} } },
+      })
+
+    const errorCalls: unknown[][] = []
+    const originalError = console.error
+    console.error = ((...args: unknown[]) => {
+      errorCalls.push(args)
+    }) as never
+
+    try {
+      await resolveAndSetActiveUserId('token', 'workspace-foreign', { warnIfMissing: false })
+
+      expect(_capturedActiveUserId).toBeUndefined()
+      expect(errorCalls.length).toBe(0)
+    } finally {
+      console.error = originalError
+    }
+  })
+
   test('calls getSpaces with correct parameters', async () => {
     const calls: unknown[][] = []
     _mockInternalRequest = (...args: unknown[]) => {
@@ -1088,15 +1116,17 @@ async function probeSpaceIdForTokenImpl(
   }
 }
 
+type WorkspaceSource = 'explicit' | 'target'
+
 async function resolveWorkspaceFromTargetImpl(
   creds: CredentialsLike,
   targetId: string,
-): Promise<{ workspaceId: string; tokenV2: string; userId?: string }> {
+): Promise<{ workspaceId: string; tokenV2: string; userId?: string; workspaceSource: WorkspaceSource }> {
   let lastError: Error | undefined
   for (const account of getAccountTokensImpl(creds)) {
     const { spaceId, error } = await probeSpaceIdForTokenImpl(account.token_v2, targetId)
     if (spaceId) {
-      return { workspaceId: spaceId, tokenV2: account.token_v2, userId: account.user_id }
+      return { workspaceId: spaceId, tokenV2: account.token_v2, userId: account.user_id, workspaceSource: 'target' }
     }
     if (error) lastError = error
   }
@@ -1108,9 +1138,9 @@ async function ensureWorkspaceContextImpl(
   creds: CredentialsLike,
   workspaceId: string | undefined,
   targetId: string,
-): Promise<{ workspaceId: string; tokenV2: string; userId?: string }> {
+): Promise<{ workspaceId: string; tokenV2: string; userId?: string; workspaceSource: WorkspaceSource }> {
   if (workspaceId) {
-    return { workspaceId, tokenV2: creds.token_v2, userId: creds.user_id }
+    return { workspaceId, tokenV2: creds.token_v2, userId: creds.user_id, workspaceSource: 'explicit' }
   }
   return resolveWorkspaceFromTargetImpl(creds, targetId)
 }
@@ -1151,7 +1181,12 @@ describe('resolveWorkspaceFromTarget', () => {
       { token_v2: 'primary', accounts: [{ token_v2: 'primary' }, { token_v2: 'secondary' }] },
       'block-1',
     )
-    expect(result).toEqual({ workspaceId: 'space-abc', tokenV2: 'secondary', userId: undefined })
+    expect(result).toEqual({
+      workspaceId: 'space-abc',
+      tokenV2: 'secondary',
+      userId: undefined,
+      workspaceSource: 'target',
+    })
   })
 
   test('resolves from the collection table when the target is a database id', async () => {
@@ -1204,7 +1239,12 @@ describe('ensureWorkspaceContext', () => {
       'block-1',
     )
     expect(called).toBe(false)
-    expect(result).toEqual({ workspaceId: 'ws-explicit', tokenV2: 'primary', userId: 'user-1' })
+    expect(result).toEqual({
+      workspaceId: 'ws-explicit',
+      tokenV2: 'primary',
+      userId: 'user-1',
+      workspaceSource: 'explicit',
+    })
   })
 
   test('falls back to auto-resolve when workspaceId is omitted', async () => {

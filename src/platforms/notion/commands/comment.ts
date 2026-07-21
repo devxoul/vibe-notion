@@ -84,7 +84,9 @@ async function listAction(options: ListOptions): Promise<void> {
     const creds = await getCredentialsOrExit()
     const pageId = formatNotionId(options.page)
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, pageId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     const response = (await internalRequest(ctx.tokenV2, 'loadPageChunk', {
       pageId,

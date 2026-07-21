@@ -529,7 +529,9 @@ async function getAction(rawCollectionId: string, options: GetOptions): Promise<
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, collectionId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
     const collection = await fetchCollection(ctx.tokenV2, collectionId)
     console.log(formatOutput(formatCollectionValue(collection as Record<string, unknown>), options.pretty))
   } catch (error) {
@@ -542,7 +544,9 @@ async function queryAction(rawCollectionId: string, options: QueryOptions): Prom
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, collectionId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
     const viewId = options.viewId ?? (await resolveCollectionViewId(ctx.tokenV2, collectionId))
 
     const loader: Record<string, unknown> = {
@@ -802,7 +806,9 @@ async function viewGetAction(rawViewId: string, options: ViewGetOptions): Promis
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, viewId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     const view = await fetchView(ctx.tokenV2, viewId)
     const viewType = view.type
@@ -834,7 +840,9 @@ async function viewUpdateAction(rawViewId: string, options: ViewUpdateOptions): 
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, viewId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     if (!options.show && !options.hide && !options.reorder && !options.resize) {
       throw new Error('Provide --show, --hide, --reorder, or --resize')
@@ -1098,7 +1106,9 @@ async function viewListAction(rawCollectionId: string, options: ViewListOptions)
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, collectionId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     const block = await resolveCollectionBlock(ctx.tokenV2, collectionId)
     const viewIds = block.view_ids ?? []
@@ -1132,7 +1142,9 @@ async function viewAddAction(rawCollectionId: string, options: ViewAddOptions): 
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, collectionId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     const viewType = options.type ?? 'table'
     if (!VIEW_TYPES.includes(viewType as (typeof VIEW_TYPES)[number])) {
@@ -1202,7 +1214,9 @@ async function viewDeleteAction(rawViewId: string, options: ViewDeleteOptions): 
   try {
     const creds = await getCredentialsOrExit()
     const ctx = await ensureWorkspaceContext(creds, options.workspaceId, viewId)
-    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId)
+    await resolveAndSetActiveUserId(ctx.tokenV2, ctx.workspaceId, {
+      warnIfMissing: ctx.workspaceSource === 'explicit',
+    })
 
     const view = await fetchView(ctx.tokenV2, viewId)
     const parentId = view.parent_id

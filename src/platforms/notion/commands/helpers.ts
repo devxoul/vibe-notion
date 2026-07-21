@@ -163,10 +163,16 @@ async function probeSpaceIdForToken(tokenV2: string, targetId: string): Promise<
   }
 }
 
+// `target` is inferred from the record's space_id: it proves API access to the
+// record but NOT workspace membership (e.g. public pages), so callers must not
+// treat a missing `target` workspace as an access failure.
+export type WorkspaceSource = 'explicit' | 'target'
+
 export type ResolvedWorkspaceContext = {
   workspaceId: string
   tokenV2: string
   userId?: string
+  workspaceSource: WorkspaceSource
 }
 
 export async function resolveWorkspaceFromTarget(
@@ -178,7 +184,7 @@ export async function resolveWorkspaceFromTarget(
   for (const account of getAccountTokens(creds)) {
     const { spaceId, error } = await probeSpaceIdForToken(account.token_v2, normalizedId)
     if (spaceId) {
-      return { workspaceId: spaceId, tokenV2: account.token_v2, userId: account.user_id }
+      return { workspaceId: spaceId, tokenV2: account.token_v2, userId: account.user_id, workspaceSource: 'target' }
     }
     if (error) lastError = error
   }
@@ -194,7 +200,7 @@ export async function ensureWorkspaceContext(
   targetId: string,
 ): Promise<ResolvedWorkspaceContext> {
   if (workspaceId) {
-    return { workspaceId, tokenV2: creds.token_v2, userId: creds.user_id }
+    return { workspaceId, tokenV2: creds.token_v2, userId: creds.user_id, workspaceSource: 'explicit' }
   }
   return resolveWorkspaceFromTarget(creds, targetId)
 }
@@ -209,7 +215,13 @@ function extractSpaceViewPointers(entry: SpaceUserEntry, userId: string): SpaceV
   return (inner?.space_view_pointers as SpaceViewPointer[]) ?? []
 }
 
-export async function resolveAndSetActiveUserId(tokenV2: string, workspaceId?: string): Promise<void> {
+export type ResolveActiveUserOptions = { warnIfMissing?: boolean }
+
+export async function resolveAndSetActiveUserId(
+  tokenV2: string,
+  workspaceId?: string,
+  options: ResolveActiveUserOptions = {},
+): Promise<void> {
   if (!workspaceId) return
 
   if (!getActiveUserId()) {
@@ -239,6 +251,10 @@ export async function resolveAndSetActiveUserId(tokenV2: string, workspaceId?: s
       return
     }
   }
+
+  // A workspace auto-resolved from the target isn't expected to be a member
+  // space (e.g. public pages), so warning there is a false alarm.
+  if (options.warnIfMissing === false) return
 
   const memberIds = Object.values(response).flatMap((entry) => (entry.space ? Object.keys(entry.space) : []))
   const allPointerIds = Object.entries(response).flatMap(([userId, entry]) =>
