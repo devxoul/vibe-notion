@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 import { getActiveSpaceId, getActiveUserId, internalRequest, setActiveSpaceId, setActiveUserId } from './client'
+import { BROWSER_USER_AGENT } from './request-headers'
 
 let mockFetch: ReturnType<typeof mock>
 const originalFetch = globalThis.fetch
@@ -31,8 +32,19 @@ describe('internalRequest', () => {
     expect(options.method).toBe('POST')
     expect(options.headers).toEqual({
       'Content-Type': 'application/json',
+      'User-Agent': BROWSER_USER_AGENT,
       cookie: 'token_v2=test_token_v2',
     })
+  })
+
+  test('sends a browser User-Agent so Cloudflare does not challenge the request', async () => {
+    // When
+    await internalRequest('test_token_v2', 'testEndpoint')
+
+    // Then
+    const [, options] = mockFetch.mock.calls[0]
+    expect(options.headers['User-Agent']).toBe(BROWSER_USER_AGENT)
+    expect(options.headers['User-Agent']).toContain('Mozilla/5.0')
   })
 
   test('passes body as JSON', async () => {

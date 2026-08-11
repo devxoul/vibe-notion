@@ -1,4 +1,5 @@
 import { CredentialManager } from '@/platforms/notion/credential-manager'
+import { BROWSER_USER_AGENT } from '@/platforms/notion/request-headers'
 import { TokenExtractor } from '@/platforms/notion/token-extractor'
 import { delay } from '@/shared/utils/delay'
 
@@ -24,6 +25,7 @@ export function getActiveSpaceId(): string | undefined {
 async function doRequest(tokenV2: string, endpoint: string, body: Record<string, unknown>): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'User-Agent': BROWSER_USER_AGENT,
     cookie: `token_v2=${tokenV2}`,
   }
 
