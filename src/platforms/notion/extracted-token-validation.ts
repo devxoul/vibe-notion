@@ -1,3 +1,4 @@
+import { BROWSER_USER_AGENT } from '@/platforms/notion/request-headers'
 import type { ExtractedToken } from '@/platforms/notion/token-extractor'
 
 export type ExtractionOutcome = {
@@ -29,6 +30,7 @@ export async function validateTokenV2(tokenV2: string): Promise<void> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'User-Agent': BROWSER_USER_AGENT,
       cookie: `token_v2=${tokenV2}`,
     },
     body: '{}',

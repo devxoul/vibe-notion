@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 import { maskToken, validateCandidates, validateTokenV2, withStoredAccounts } from './extracted-token-validation'
+import { BROWSER_USER_AGENT } from './request-headers'
 
 let originalFetch: typeof fetch
 
@@ -14,6 +15,16 @@ afterEach(() => {
 })
 
 describe('extracted-token-validation', () => {
+  test('validateTokenV2 sends a browser User-Agent so Cloudflare does not challenge the request', async () => {
+    const fetchMock = mock(() => Promise.resolve({ ok: true })) as unknown as typeof fetch
+    globalThis.fetch = fetchMock
+
+    await validateTokenV2('some-token')
+
+    const [, init] = (fetchMock as unknown as ReturnType<typeof mock>).mock.calls[0]
+    expect((init.headers as Record<string, string>)['User-Agent']).toBe(BROWSER_USER_AGENT)
+  })
+
   test('validateCandidates keeps later valid candidates when earlier ones are stale', async () => {
     globalThis.fetch = mock((url: string, init?: RequestInit) => {
       const cookieHeader =
