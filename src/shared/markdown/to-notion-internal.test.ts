@@ -357,9 +357,9 @@ describe('markdownToBlocks', () => {
     ])
   })
 
-  test('image with a file name containing spaces keeps the whole reference', () => {
-    const result = markdownToBlocks('![Local](<attachment:11111111-2222-3333-4444-555555555555:my cat.png>)')
-    expect(result[0].properties?.source).toEqual([['attachment:11111111-2222-3333-4444-555555555555:my cat.png']])
+  test('image with an unbalanced parenthesis in its file name keeps the whole reference', () => {
+    const result = markdownToBlocks('![Local](<attachment:11111111-2222-3333-4444-555555555555:unbal_(1.png>)')
+    expect(result[0].properties?.source).toEqual([['attachment:11111111-2222-3333-4444-555555555555:unbal_(1.png']])
   })
 
   test('text around an image splits into sibling blocks', () => {

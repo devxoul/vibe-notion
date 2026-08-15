@@ -51,15 +51,16 @@ export async function preprocessMarkdownImages(
   return result
 }
 
-// A bare destination ends at the first space or parenthesis, which would truncate an
-// `attachment:{fileId}:{name}` reference whose file name contains either.
+// Notion keeps parentheses in an uploaded file name, so `weird (1.png` comes back as
+// `weird_(1.png`. A bare destination only allows balanced parentheses, so that name would stop the
+// image parsing early; angle brackets keep it in one piece.
 function formatDestination(value: string): string {
   if (!/[\s()<>]/.test(value)) return value
   return `<${value.replace(/[<>\\]/g, '\\$&')}>`
 }
 
-// Markdown lets a destination be wrapped in angle brackets, which is how a path or an uploaded
-// reference containing spaces is written. Unwrap it so what follows sees the value itself.
+// Markdown lets a destination be wrapped in angle brackets, which is how a local path containing
+// spaces is written. Unwrap it so what follows sees the value itself.
 function unwrapDestination(value: string): string {
   if (!value.startsWith('<') || !value.endsWith('>')) return value
   return value.slice(1, -1).replace(/\\([<>\\])/g, '$1')

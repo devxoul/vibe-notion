@@ -333,20 +333,20 @@ describe('preprocessMarkdownImages', () => {
     expect(preprocessMarkdownImages(markdown, uploadFn, '/tmp')).rejects.toThrow('Image file not found')
   })
 
-  test('wraps an uploaded reference containing spaces so the destination survives parsing', async () => {
-    // given
-    const tmpFile = createTempFile('spaced.png')
+  test('wraps an uploaded reference whose file name has an unbalanced parenthesis', async () => {
+    // given — Notion turns `unbal (1.png` into `unbal_(1.png`, which a bare destination cannot hold
+    const tmpFile = createTempFile('unbalanced.png')
     const basePath = path.dirname(tmpFile)
     const fileName = path.basename(tmpFile)
     const markdown = `![alt](./${fileName})`
-    const uploadFn = mock(async (_filePath: string) => 'attachment:1111:my photo.png')
+    const uploadFn = mock(async (_filePath: string) => 'attachment:1111:unbal_(1.png')
 
     try {
       // when
       const result = await preprocessMarkdownImages(markdown, uploadFn, basePath)
 
       // then
-      expect(result).toBe('![alt](<attachment:1111:my photo.png>)')
+      expect(result).toBe('![alt](<attachment:1111:unbal_(1.png>)')
     } finally {
       fs.unlinkSync(tmpFile)
     }
