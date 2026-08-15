@@ -20,7 +20,7 @@ export async function preprocessMarkdownImages(
   let result = markdown
 
   for (const match of matches) {
-    const imagePath = match[2]
+    const imagePath = unwrapDestination(match[2].trim())
 
     // Skip empty paths
     if (!imagePath.trim()) continue
@@ -56,4 +56,11 @@ export async function preprocessMarkdownImages(
 function formatDestination(value: string): string {
   if (!/[\s()<>]/.test(value)) return value
   return `<${value.replace(/[<>\\]/g, '\\$&')}>`
+}
+
+// Markdown lets a destination be wrapped in angle brackets, which is how a path or an uploaded
+// reference containing spaces is written. Unwrap it so what follows sees the value itself.
+function unwrapDestination(value: string): string {
+  if (!value.startsWith('<') || !value.endsWith('>')) return value
+  return value.slice(1, -1).replace(/\\([<>\\])/g, '$1')
 }

@@ -271,6 +271,59 @@ describe('preprocessMarkdownImages', () => {
     expect(uploadFn).toHaveBeenCalledTimes(0)
   })
 
+  test('a second pass over already-uploaded markdown uploads nothing and changes nothing', async () => {
+    // given
+    const tmpFile = createTempFile('twopass.png')
+    const basePath = path.dirname(tmpFile)
+    const fileName = path.basename(tmpFile)
+    const firstUpload = mock(async (_filePath: string) => 'attachment:1111:my photo.png')
+    const secondUpload = mock(async (_filePath: string) => 'should-not-be-called')
+
+    try {
+      // when
+      const firstPass = await preprocessMarkdownImages(`![alt](./${fileName})`, firstUpload, basePath)
+      const secondPass = await preprocessMarkdownImages(firstPass, secondUpload, basePath)
+
+      // then
+      expect(secondPass).toBe(firstPass)
+      expect(secondUpload).toHaveBeenCalledTimes(0)
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  test('resolves an angle-bracketed local path', async () => {
+    // given
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'preprocess-angle-'))
+    const imgFile = path.join(tmpDir, 'my photo.png')
+    fs.writeFileSync(imgFile, 'fake-data')
+    const uploadFn = mock(async (_filePath: string) => 'attachment:2222:uploaded.png')
+
+    try {
+      // when
+      const result = await preprocessMarkdownImages('![alt](<my photo.png>)', uploadFn, tmpDir)
+
+      // then
+      expect(result).toBe('![alt](attachment:2222:uploaded.png)')
+      expect(uploadFn.mock.calls[0][0]).toBe(imgFile)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  test('leaves an unclosed angle bracket in the destination alone', async () => {
+    // given
+    const markdown = '![alt](<unclosed.png)'
+
+    // when/then
+    try {
+      await preprocessMarkdownImages(markdown, async () => '', '/tmp')
+      expect(true).toBe(false) // should not reach here
+    } catch (error: unknown) {
+      expect((error as Error).message).toContain('/tmp/<unclosed.png')
+    }
+  })
+
   test('treats a Windows drive letter as a local path rather than a URI scheme', async () => {
     // given
     const markdown = '![alt](C:\\images\\photo.png)'
