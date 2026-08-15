@@ -258,6 +258,57 @@ describe('preprocessMarkdownImages', () => {
     }
   })
 
+  test('leaves already-uploaded attachment references untouched', async () => {
+    // given
+    const markdown = '![alt](attachment:11111111-2222-3333-4444-555555555555:photo.png)'
+    const uploadFn = mock(async (_filePath: string) => 'https://should-not-be-called.com')
+
+    // when
+    const result = await preprocessMarkdownImages(markdown, uploadFn, '/tmp')
+
+    // then
+    expect(result).toBe(markdown)
+    expect(uploadFn).toHaveBeenCalledTimes(0)
+  })
+
+  test('wraps an uploaded reference containing spaces so the destination survives parsing', async () => {
+    // given
+    const tmpFile = createTempFile('spaced.png')
+    const basePath = path.dirname(tmpFile)
+    const fileName = path.basename(tmpFile)
+    const markdown = `![alt](./${fileName})`
+    const uploadFn = mock(async (_filePath: string) => 'attachment:1111:my photo.png')
+
+    try {
+      // when
+      const result = await preprocessMarkdownImages(markdown, uploadFn, basePath)
+
+      // then
+      expect(result).toBe('![alt](<attachment:1111:my photo.png>)')
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  test('keeps a dollar sign in an uploaded file name verbatim', async () => {
+    // given
+    const tmpFile = createTempFile('dollar.png')
+    const basePath = path.dirname(tmpFile)
+    const fileName = path.basename(tmpFile)
+    const markdown = `![alt](./${fileName})`
+    const uploadFn = mock(async (_filePath: string) => 'attachment:1111:price$&total.png')
+
+    try {
+      // when
+      const result = await preprocessMarkdownImages(markdown, uploadFn, basePath)
+
+      // then
+      expect(result).toBe('![alt](attachment:1111:price$&total.png)')
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
   test('handles image paths with spaces and titles', async () => {
     // given
     const tmpFile = createTempFile('my photo.png')

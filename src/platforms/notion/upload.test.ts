@@ -128,7 +128,6 @@ describe('upload', () => {
     const operations = ((saveCall?.[2] as any)?.transactions?.[0]?.operations ?? []) as any[]
     const setOperation = operations.find((operation) => operation.command === 'set')
 
-    // The signed read URL expires, so persisting it would leave a broken image behind.
     expect(setOperation?.args?.properties?.source).toEqual([
       ['attachment:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:photo.png'],
     ])

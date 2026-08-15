@@ -128,6 +128,15 @@ function appendBlockOperations(
     },
   )
 
+  for (const fileId of def.fileIds ?? []) {
+    operations.push({
+      pointer: { table: 'block', id: blockId, spaceId },
+      command: 'listAfter',
+      path: ['file_ids'],
+      args: { id: fileId },
+    })
+  }
+
   for (const child of def.children ?? []) {
     appendBlockOperations(operations, child, generateId(), blockId, spaceId)
   }

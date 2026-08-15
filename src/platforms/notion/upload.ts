@@ -6,9 +6,7 @@ import { internalRequest } from './client'
 import { generateId } from './commands/helpers'
 
 type UploadFileUrlResponse = {
-  // Permanent file reference (attachment:{fileId}:{name}) that belongs in a block's source property
   url: string
-  // Short-lived signed read URL; Notion mints a fresh one every time it renders the block
   signedGetUrl?: string
   signedPutUrl: string
 }

@@ -1,4 +1,15 @@
-import type { Blockquote, Code, Heading, List, ListItem, Paragraph, PhrasingContent, RootContent, Table } from 'mdast'
+import type {
+  Blockquote,
+  Code,
+  Heading,
+  Image,
+  List,
+  ListItem,
+  Paragraph,
+  PhrasingContent,
+  RootContent,
+  Table,
+} from 'mdast'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import { unified } from 'unified'
@@ -6,6 +17,8 @@ import { unified } from 'unified'
 import type { InternalBlockDefinition } from './types'
 
 type RichTextSegment = [string] | [string, string[][]]
+
+const ATTACHMENT_PREFIX = 'attachment:'
 
 export function markdownToBlocks(markdown: string): InternalBlockDefinition[] {
   if (!markdown.trim()) return []
@@ -25,7 +38,7 @@ function convertNode(node: RootContent): InternalBlockDefinition[] {
     case 'heading':
       return [convertHeading(node)]
     case 'paragraph':
-      return [convertParagraph(node)]
+      return convertParagraph(node)
     case 'list':
       return convertList(node)
     case 'blockquote':
@@ -51,11 +64,57 @@ function convertHeading(node: Heading): InternalBlockDefinition {
   return { type, properties: { title: convertInlineContent(node.children) } }
 }
 
-function convertParagraph(node: Paragraph): InternalBlockDefinition {
-  return {
-    type: 'text',
-    properties: { title: convertInlineContent(node.children) },
+function convertParagraph(node: Paragraph): InternalBlockDefinition[] {
+  if (!node.children.some((child) => child.type === 'image')) {
+    return [{ type: 'text', properties: { title: convertInlineContent(node.children) } }]
   }
+
+  // Notion has no inline image, so images become sibling blocks and the surrounding text keeps its own block.
+  const blocks: InternalBlockDefinition[] = []
+  let inline: PhrasingContent[] = []
+
+  for (const child of node.children) {
+    if (child.type !== 'image') {
+      inline.push(child)
+      continue
+    }
+    appendTextBlock(blocks, inline)
+    inline = []
+    blocks.push(convertImage(child))
+  }
+  appendTextBlock(blocks, inline)
+
+  return blocks
+}
+
+function appendTextBlock(blocks: InternalBlockDefinition[], nodes: PhrasingContent[]): void {
+  if (nodes.length === 0) return
+  const title = convertInlineContent(nodes)
+  if (!title.some(([text]) => text.trim())) return
+  blocks.push({ type: 'text', properties: { title } })
+}
+
+function convertImage(node: Image): InternalBlockDefinition {
+  const fileId = extractAttachmentFileId(node.url)
+  const caption = node.alt || node.title || (fileId ? attachmentFileName(node.url) : '')
+  const block: InternalBlockDefinition = {
+    type: 'image',
+    properties: { source: [[node.url]], title: [[caption]] },
+  }
+  // Notion refuses to sign a file the block does not claim, so an uploaded image must list its file id.
+  if (fileId) block.fileIds = [fileId]
+  return block
+}
+
+function extractAttachmentFileId(url: string): string | undefined {
+  if (!url.startsWith(ATTACHMENT_PREFIX)) return undefined
+  const fileId = url.slice(ATTACHMENT_PREFIX.length).split(':')[0]
+  return fileId || undefined
+}
+
+function attachmentFileName(url: string): string {
+  const separator = url.indexOf(':', ATTACHMENT_PREFIX.length)
+  return separator === -1 ? '' : url.slice(separator + 1)
 }
 
 function convertList(node: List): InternalBlockDefinition[] {

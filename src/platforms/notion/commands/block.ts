@@ -108,6 +108,7 @@ type BlockDefinition = {
   type: string
   properties?: Record<string, unknown>
   format?: Record<string, unknown>
+  fileIds?: string[]
   children?: BlockDefinition[]
 }
 
@@ -327,6 +328,14 @@ function appendBlockOperations(
       args: beforeId ? { id: blockId, before: beforeId } : afterId ? { id: blockId, after: afterId } : { id: blockId },
     },
   )
+  for (const fileId of def.fileIds ?? []) {
+    operations.push({
+      pointer: { table: 'block', id: blockId, spaceId },
+      command: 'listAfter',
+      path: ['file_ids'],
+      args: { id: fileId },
+    })
+  }
   if (def.children) {
     for (const child of def.children) {
       const childBlockId = generateId()

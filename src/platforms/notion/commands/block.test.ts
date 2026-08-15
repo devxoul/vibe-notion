@@ -970,6 +970,75 @@ describe('blockCommand', () => {
       )
     })
 
+    test('persists an uploaded markdown image as an image block claiming its file id', async () => {
+      // Given
+      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'new-block-id')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+        resolveBacklinkUsers: mock(async () => ({})),
+        resolveDefaultTeamId: mock(async () => undefined),
+        ensureWorkspaceContext: mock(async (creds, workspaceId) => ({
+          workspaceId: workspaceId ?? 'space-mock',
+          tokenV2: (creds && creds.token_v2) || 'test-token',
+          userId: creds && creds.user_id,
+        })),
+        resolveWorkspaceFromTarget: mock(async () => ({ workspaceId: 'space-mock', tokenV2: 'test-token' })),
+        getAccountTokens: mock((creds) => [
+          { token_v2: (creds && creds.token_v2) || 'test-token', user_id: creds && creds.user_id },
+        ]),
+      }))
+
+      mock.module('@/shared/markdown/preprocess-images', () => ({
+        preprocessMarkdownImages: mock(async () => '![Local](attachment:file-123:cat.png)'),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const originalLog = console.log
+      console.log = () => {}
+
+      try {
+        // When
+        await blockCommand.parseAsync(
+          ['append', 'parent-1', '--workspace-id', 'space-123', '--markdown', '![Local](./cat.png)'],
+          { from: 'user' },
+        )
+      } catch {
+        // Expected to exit
+      }
+
+      console.log = originalLog
+
+      // Then
+      const saveCall = mockInternalRequest.mock.calls.find((call) => call[1] === 'saveTransactions')
+      const operations = ((saveCall?.[2] as any)?.transactions?.[0]?.operations ?? []) as any[]
+
+      const setOperation = operations.find((operation) => operation.command === 'set')
+      expect(setOperation?.args?.type).toBe('image')
+      expect(setOperation?.args?.properties?.source).toEqual([['attachment:file-123:cat.png']])
+
+      const fileIdOperation = operations.find((operation) => operation.path?.[0] === 'file_ids')
+      expect(fileIdOperation).toEqual(
+        expect.objectContaining({
+          pointer: { table: 'block', id: 'new-block-id', spaceId: 'space-123' },
+          command: 'listAfter',
+          path: ['file_ids'],
+          args: { id: 'file-123' },
+        }),
+      )
+    })
+
     test('preprocesses markdown images before converting blocks', async () => {
       // Given
       const mockInternalRequest = mock(() => Promise.resolve({}))
