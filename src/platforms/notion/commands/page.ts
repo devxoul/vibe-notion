@@ -377,7 +377,7 @@ export async function handlePageCreate(
     const uploadFn = async (filePath: string): Promise<string> => {
       await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
       const result = await uploadFileOnly(tokenV2, filePath, newPageId, spaceId)
-      return result.url
+      return result.source
     }
     const markdown = LOCAL_MARKDOWN_IMAGE_PATTERN.test(rawMarkdown)
       ? await preprocessMarkdownImages(rawMarkdown, uploadFn, basePath)
@@ -507,7 +507,7 @@ export async function handlePageUpdate(
     const uploadFn = async (filePath: string): Promise<string> => {
       await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
       const result = await uploadFileOnly(tokenV2, filePath, pageId, spaceId)
-      return result.url
+      return result.source
     }
     const md = LOCAL_MARKDOWN_IMAGE_PATTERN.test(rawMarkdown)
       ? await preprocessMarkdownImages(rawMarkdown, uploadFn, basePath)

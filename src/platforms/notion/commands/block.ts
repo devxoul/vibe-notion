@@ -372,7 +372,7 @@ export async function handleBlockAppend(
       await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
       const spaceId = await resolveSpaceId(tokenV2, parentId)
       const result = await uploadFileOnly(tokenV2, filePath, parentId, spaceId)
-      return result.url
+      return result.source
     }
     const markdown = LOCAL_MARKDOWN_IMAGE_PATTERN.test(rawMarkdown)
       ? await preprocessMarkdownImages(rawMarkdown, uploadFn, basePath)

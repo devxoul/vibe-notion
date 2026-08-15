@@ -6,7 +6,9 @@ import { internalRequest } from './client'
 import { generateId } from './commands/helpers'
 
 type UploadFileUrlResponse = {
+  // Permanent file reference (attachment:{fileId}:{name}) that belongs in a block's source property
   url: string
+  // Short-lived signed read URL; Notion mints a fresh one every time it renders the block
   signedGetUrl?: string
   signedPutUrl: string
 }
@@ -50,7 +52,7 @@ export async function getUploadUrl(
   fileName: string,
   contentType: string,
   record: { table: string; id: string; spaceId: string },
-): Promise<{ url: string; signedPutUrl: string; fileId: string }> {
+): Promise<{ source: string; url: string; signedPutUrl: string; fileId: string }> {
   const response = (await uploadDeps.internalRequest(tokenV2, 'getUploadFileUrl', {
     bucket: 'secure',
     contentType,
@@ -58,11 +60,12 @@ export async function getUploadUrl(
     record,
   })) as UploadFileUrlResponse
 
-  const sourceUrl = response.url
-  const fileId = extractFileId(sourceUrl)
+  const source = response.url
+  const fileId = extractFileId(source)
 
   return {
-    url: response.signedGetUrl ?? sourceUrl,
+    source,
+    url: response.signedGetUrl ?? source,
     signedPutUrl: response.signedPutUrl,
     fileId,
   }
@@ -88,7 +91,7 @@ export async function uploadFileOnly(
   filePath: string,
   parentId: string,
   spaceId: string,
-): Promise<{ url: string; fileId: string; contentType: string; name: string }> {
+): Promise<{ source: string; url: string; fileId: string; contentType: string; name: string }> {
   const fileInfo = uploadDeps.resolveFileInfo(filePath)
   const record = { table: 'block', id: parentId, spaceId }
   const uploadInfo = await getUploadUrl(tokenV2, fileInfo.name, fileInfo.contentType, record)
@@ -96,6 +99,7 @@ export async function uploadFileOnly(
   await uploadToS3(uploadInfo.signedPutUrl, fileBuffer, fileInfo.contentType)
 
   return {
+    source: uploadInfo.source,
     url: uploadInfo.url,
     fileId: uploadInfo.fileId,
     contentType: fileInfo.contentType,
@@ -127,7 +131,7 @@ export async function uploadFile(
         parent_table: 'block',
         alive: true,
         properties: {
-          source: [[upload.url]],
+          source: [[upload.source]],
           title: [[upload.name]],
         },
         space_id: spaceId,
