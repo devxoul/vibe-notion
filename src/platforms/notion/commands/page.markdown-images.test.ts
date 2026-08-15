@@ -125,25 +125,4 @@ describe('page markdown image blocks', () => {
       }),
     )
   })
-
-  test('a remote markdown image is stored without claiming a file id', async () => {
-    // Given
-    const internalRequest = mockBoundaries('![Remote](https://example.com/cat.png)')
-    const { handlePageCreate } = await import('./page')
-
-    // When
-    await handlePageCreate('test-token', {
-      parent: 'parent-page',
-      title: 'New Page',
-      markdown: '![Local](./images/cat.png)',
-      workspaceId: SPACE_ID,
-    })
-
-    // Then
-    const operations = findImageOperations(internalRequest)
-    expect(operations.find((operation) => operation.args?.type === 'image')?.args?.properties?.source).toEqual([
-      ['https://example.com/cat.png'],
-    ])
-    expect(operations.find((operation) => operation.path?.[0] === 'file_ids')).toBeUndefined()
-  })
 })

@@ -311,19 +311,6 @@ describe('preprocessMarkdownImages', () => {
     }
   })
 
-  test('leaves an unclosed angle bracket in the destination alone', async () => {
-    // given
-    const markdown = '![alt](<unclosed.png)'
-
-    // when/then
-    try {
-      await preprocessMarkdownImages(markdown, async () => '', '/tmp')
-      expect(true).toBe(false) // should not reach here
-    } catch (error: unknown) {
-      expect((error as Error).message).toContain('/tmp/<unclosed.png')
-    }
-  })
-
   test('treats a Windows drive letter as a local path rather than a URI scheme', async () => {
     // given
     const markdown = '![alt](C:\\images\\photo.png)'

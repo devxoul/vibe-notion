@@ -96,7 +96,7 @@ function appendTextBlock(blocks: InternalBlockDefinition[], nodes: PhrasingConte
 
 function convertImage(node: Image): InternalBlockDefinition {
   const fileId = extractAttachmentFileId(node.url)
-  const caption = node.alt || node.title || (fileId ? attachmentFileName(node.url) : '')
+  const caption = node.alt || (fileId ? attachmentFileName(node.url) : '')
   const block: InternalBlockDefinition = {
     type: 'image',
     properties: { source: [[node.url]], title: [[caption]] },
