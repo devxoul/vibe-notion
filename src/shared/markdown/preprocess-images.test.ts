@@ -271,6 +271,15 @@ describe('preprocessMarkdownImages', () => {
     expect(uploadFn).toHaveBeenCalledTimes(0)
   })
 
+  test('treats a Windows drive letter as a local path rather than a URI scheme', async () => {
+    // given
+    const markdown = '![alt](C:\\images\\photo.png)'
+    const uploadFn = mock(async (_filePath: string) => 'https://should-not-be-called.com')
+
+    // when/then — reaching the missing-file error proves it was not skipped as remote
+    expect(preprocessMarkdownImages(markdown, uploadFn, '/tmp')).rejects.toThrow('Image file not found')
+  })
+
   test('wraps an uploaded reference containing spaces so the destination survives parsing', async () => {
     // given
     const tmpFile = createTempFile('spaced.png')

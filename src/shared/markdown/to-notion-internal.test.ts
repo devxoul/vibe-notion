@@ -374,4 +374,9 @@ describe('markdownToBlocks', () => {
     expect(result).toHaveLength(1)
     expect(result[0].type).toBe('image')
   })
+
+  test('whitespace between adjacent images does not become a text block', () => {
+    const result = markdownToBlocks('![One](attachment:1111:one.png) ![Two](attachment:2222:two.png)')
+    expect(result.map((block) => block.type)).toEqual(['image', 'image'])
+  })
 })

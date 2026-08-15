@@ -6,24 +6,26 @@ const SPACE_ID = 'space-123'
 // Lives in its own file because these cases need preprocessMarkdownImages to return an uploaded
 // reference, and a module mock set by an earlier test in page.test.ts sticks to the loaded module.
 function mockBoundaries(uploadedMarkdown: string): ReturnType<typeof mock> {
-  const internalRequest = mock(async (_tokenV2: string, endpoint: string) => {
+  const internalRequest = mock(async (_tokenV2: string, endpoint: string, body?: any) => {
     if (endpoint === 'syncRecordValues') {
-      return {
-        recordMap: {
-          block: {
-            [PAGE_ID]: {
-              value: {
-                id: PAGE_ID,
-                type: 'page',
-                parent_id: 'parent-page',
-                space_id: SPACE_ID,
-                properties: { title: [['New Page']] },
-              },
-              role: 'editor',
+      // Answer for whichever id is asked about, since generated ids differ per call
+      const ids: string[] = (body?.requests ?? []).map((request: any) => request.id ?? request.pointer?.id)
+      const block = Object.fromEntries(
+        [...ids, PAGE_ID].filter(Boolean).map((id) => [
+          id,
+          {
+            value: {
+              id,
+              type: 'page',
+              parent_id: 'parent-page',
+              space_id: SPACE_ID,
+              properties: { title: [['New Page']] },
             },
+            role: 'editor',
           },
-        },
-      }
+        ]),
+      )
+      return { recordMap: { block } }
     }
     if (endpoint === 'loadPageChunk') {
       return { recordMap: { block: { [PAGE_ID]: { value: { id: PAGE_ID, content: [] } } } } }
@@ -33,9 +35,11 @@ function mockBoundaries(uploadedMarkdown: string): ReturnType<typeof mock> {
 
   mock.module('../client', () => ({ internalRequest }))
 
+  // Distinct ids per call, so an operation aimed at the parent cannot pass as one aimed at the block
+  let generated = 0
   mock.module('./helpers', () => ({
     getCredentialsOrExit: mock(async () => ({ token_v2: 'test-token' })),
-    generateId: mock(() => PAGE_ID),
+    generateId: mock(() => `gen-${++generated}`),
     resolveSpaceId: mock(async () => SPACE_ID),
     resolveCollectionViewId: mock(async () => 'view-mock'),
     resolveAndSetActiveUserId: mock(async () => {}),
@@ -82,12 +86,14 @@ describe('page markdown image blocks', () => {
 
     // Then
     const operations = findImageOperations(internalRequest)
-    expect(operations.find((operation) => operation.args?.type === 'image')?.args?.properties?.source).toEqual([
-      ['attachment:file-123:cat.png'],
-    ])
+    const imageBlock = operations.find((operation) => operation.args?.type === 'image')
+    expect(imageBlock?.args?.properties?.source).toEqual([['attachment:file-123:cat.png']])
+
+    // The claim must name the image block itself; naming its parent leaves the image unrenderable
+    expect(imageBlock?.args?.parent_id).not.toBe(imageBlock?.args?.id)
     expect(operations.find((operation) => operation.path?.[0] === 'file_ids')).toEqual(
       expect.objectContaining({
-        pointer: { table: 'block', id: PAGE_ID, spaceId: SPACE_ID },
+        pointer: { table: 'block', id: imageBlock?.args?.id, spaceId: SPACE_ID },
         command: 'listAfter',
         path: ['file_ids'],
         args: { id: 'file-123' },
@@ -110,10 +116,14 @@ describe('page markdown image blocks', () => {
 
     // Then
     const operations = findImageOperations(internalRequest)
-    expect(operations.find((operation) => operation.args?.type === 'image')?.args?.properties?.source).toEqual([
-      ['attachment:file-456:cat.png'],
-    ])
-    expect(operations.find((operation) => operation.path?.[0] === 'file_ids')?.args).toEqual({ id: 'file-456' })
+    const imageBlock = operations.find((operation) => operation.args?.type === 'image')
+    expect(imageBlock?.args?.properties?.source).toEqual([['attachment:file-456:cat.png']])
+    expect(operations.find((operation) => operation.path?.[0] === 'file_ids')).toEqual(
+      expect.objectContaining({
+        pointer: { table: 'block', id: imageBlock?.args?.id, spaceId: SPACE_ID },
+        args: { id: 'file-456' },
+      }),
+    )
   })
 
   test('a remote markdown image is stored without claiming a file id', async () => {
