@@ -1,6 +1,6 @@
 {
   "name": "vibe-notion",
-  "version": "1.10.2",
+  "version": "1.11.0",
   "description": "Notion API CLI for AI agents",
   "license": "MIT",
   "repository": {
