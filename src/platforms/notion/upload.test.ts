@@ -53,8 +53,24 @@ describe('upload', () => {
     expect(result).toEqual({
       fileId: '11111111-2222-3333-4444-555555555555',
       signedPutUrl: 'https://s3.put/url',
+      source: 'https://secure.notion-static.com/11111111-2222-3333-4444-555555555555/sample.png',
       url: 'https://s3.get/url',
     })
+  })
+
+  test('getUploadUrl falls back to the permanent url when no signed read url is returned', async () => {
+    uploadDeps.internalRequest = mock(() =>
+      Promise.resolve({
+        url: 'attachment:11111111-2222-3333-4444-555555555555:sample.png',
+        signedPutUrl: 'https://s3.put/url',
+      }),
+    )
+
+    const record = { table: 'block', id: 'block-123', spaceId: 'space-456' }
+    const result = await getUploadUrl('token-v2', 'sample.png', 'image/png', record)
+
+    expect(result.source).toBe('attachment:11111111-2222-3333-4444-555555555555:sample.png')
+    expect(result.url).toBe('attachment:11111111-2222-3333-4444-555555555555:sample.png')
   })
 
   test('uploadToS3 uploads file bytes with content headers', async () => {
@@ -72,6 +88,50 @@ describe('upload', () => {
       },
       method: 'PUT',
     })
+  })
+
+  test('uploadFile stores the permanent attachment reference as the block source', async () => {
+    const filePath = path.join(tempDir, 'photo.png')
+    const fileBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47])
+    fs.writeFileSync(filePath, fileBuffer)
+
+    const fileInfo: FileInfo = {
+      path: filePath,
+      name: 'photo.png',
+      size: fileBuffer.length,
+      contentType: 'image/png',
+      isImage: true,
+    }
+    const ids = ['new-block-id', 'request-id', 'transaction-id']
+    const signedGetUrl =
+      'https://file.notion.so/f/f/space-id/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photo.png?expirationTimestamp=1786838400000&signature=abc'
+    const mockInternalRequest = mock((_token: string, endpoint: string, _body?: unknown) => {
+      if (endpoint === 'getUploadFileUrl') {
+        return Promise.resolve({
+          url: 'attachment:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:photo.png',
+          signedPutUrl: 'https://s3.put/upload',
+          signedGetUrl,
+        })
+      }
+      return Promise.resolve({})
+    })
+
+    uploadDeps.resolveFileInfo = mock(() => fileInfo)
+    uploadDeps.readFileSync = mock(() => fileBuffer) as unknown as typeof uploadDeps.readFileSync
+    uploadDeps.generateId = mock(() => ids.shift() ?? 'fallback-id')
+    uploadDeps.internalRequest = mockInternalRequest
+    uploadDeps.fetch = mock(() => Promise.resolve({ ok: true })) as unknown as typeof fetch
+
+    const result = await uploadFile('token-v2', 'parent-id', filePath, 'space-id')
+
+    const saveCall = mockInternalRequest.mock.calls.find((call) => call[1] === 'saveTransactions')
+    const operations = ((saveCall?.[2] as any)?.transactions?.[0]?.operations ?? []) as any[]
+    const setOperation = operations.find((operation) => operation.command === 'set')
+
+    expect(setOperation?.args?.properties?.source).toEqual([
+      ['attachment:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:photo.png'],
+    ])
+    expect(result.url).toBe(signedGetUrl)
   })
 
   test('uploadFile creates image block and appends file id', async () => {
@@ -141,7 +201,7 @@ describe('upload', () => {
             alive: true,
             space_id: 'space-id',
             properties: {
-              source: [['https://s3.get/download']],
+              source: [['https://secure.notion-static.com/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photo.png']],
               title: [['photo.png']],
             },
           }),

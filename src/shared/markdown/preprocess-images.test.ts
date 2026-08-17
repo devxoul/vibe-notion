@@ -258,6 +258,106 @@ describe('preprocessMarkdownImages', () => {
     }
   })
 
+  test('leaves already-uploaded attachment references untouched', async () => {
+    // given
+    const markdown = '![alt](attachment:11111111-2222-3333-4444-555555555555:photo.png)'
+    const uploadFn = mock(async (_filePath: string) => 'https://should-not-be-called.com')
+
+    // when
+    const result = await preprocessMarkdownImages(markdown, uploadFn, '/tmp')
+
+    // then
+    expect(result).toBe(markdown)
+    expect(uploadFn).toHaveBeenCalledTimes(0)
+  })
+
+  test('a second pass over already-uploaded markdown uploads nothing and changes nothing', async () => {
+    // given
+    const tmpFile = createTempFile('twopass.png')
+    const basePath = path.dirname(tmpFile)
+    const fileName = path.basename(tmpFile)
+    const firstUpload = mock(async (_filePath: string) => 'attachment:1111:my photo.png')
+    const secondUpload = mock(async (_filePath: string) => 'should-not-be-called')
+
+    try {
+      // when
+      const firstPass = await preprocessMarkdownImages(`![alt](./${fileName})`, firstUpload, basePath)
+      const secondPass = await preprocessMarkdownImages(firstPass, secondUpload, basePath)
+
+      // then
+      expect(secondPass).toBe(firstPass)
+      expect(secondUpload).toHaveBeenCalledTimes(0)
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  test('resolves an angle-bracketed local path', async () => {
+    // given
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'preprocess-angle-'))
+    const imgFile = path.join(tmpDir, 'my photo.png')
+    fs.writeFileSync(imgFile, 'fake-data')
+    const uploadFn = mock(async (_filePath: string) => 'attachment:2222:uploaded.png')
+
+    try {
+      // when
+      const result = await preprocessMarkdownImages('![alt](<my photo.png>)', uploadFn, tmpDir)
+
+      // then
+      expect(result).toBe('![alt](attachment:2222:uploaded.png)')
+      expect(uploadFn.mock.calls[0][0]).toBe(imgFile)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  test('treats a Windows drive letter as a local path rather than a URI scheme', async () => {
+    // given
+    const markdown = '![alt](C:\\images\\photo.png)'
+    const uploadFn = mock(async (_filePath: string) => 'https://should-not-be-called.com')
+
+    // when/then — reaching the missing-file error proves it was not skipped as remote
+    expect(preprocessMarkdownImages(markdown, uploadFn, '/tmp')).rejects.toThrow('Image file not found')
+  })
+
+  test('wraps an uploaded reference whose file name has an unbalanced parenthesis', async () => {
+    // given — Notion turns `unbal (1.png` into `unbal_(1.png`, which a bare destination cannot hold
+    const tmpFile = createTempFile('unbalanced.png')
+    const basePath = path.dirname(tmpFile)
+    const fileName = path.basename(tmpFile)
+    const markdown = `![alt](./${fileName})`
+    const uploadFn = mock(async (_filePath: string) => 'attachment:1111:unbal_(1.png')
+
+    try {
+      // when
+      const result = await preprocessMarkdownImages(markdown, uploadFn, basePath)
+
+      // then
+      expect(result).toBe('![alt](<attachment:1111:unbal_(1.png>)')
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  test('keeps a dollar sign in an uploaded file name verbatim', async () => {
+    // given
+    const tmpFile = createTempFile('dollar.png')
+    const basePath = path.dirname(tmpFile)
+    const fileName = path.basename(tmpFile)
+    const markdown = `![alt](./${fileName})`
+    const uploadFn = mock(async (_filePath: string) => 'attachment:1111:price$&total.png')
+
+    try {
+      // when
+      const result = await preprocessMarkdownImages(markdown, uploadFn, basePath)
+
+      // then
+      expect(result).toBe('![alt](attachment:1111:price$&total.png)')
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
   test('handles image paths with spaces and titles', async () => {
     // given
     const tmpFile = createTempFile('my photo.png')

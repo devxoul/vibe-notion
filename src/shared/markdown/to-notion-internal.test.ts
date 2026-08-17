@@ -327,4 +327,56 @@ describe('markdownToBlocks', () => {
     expect(result[1].type).toBe('table')
     expect(result[2].type).toBe('text')
   })
+
+  test('uploaded image becomes an image block that claims its file id', () => {
+    const result = markdownToBlocks('![Local](attachment:11111111-2222-3333-4444-555555555555:cat.png)')
+    expect(result).toEqual([
+      {
+        type: 'image',
+        properties: {
+          source: [['attachment:11111111-2222-3333-4444-555555555555:cat.png']],
+          title: [['Local']],
+        },
+        fileIds: ['11111111-2222-3333-4444-555555555555'],
+      },
+    ])
+  })
+
+  test('image alt text falls back to the attachment file name', () => {
+    const result = markdownToBlocks('![](attachment:11111111-2222-3333-4444-555555555555:cat.png)')
+    expect(result[0].properties?.title).toEqual([['cat.png']])
+  })
+
+  test('remote image becomes an image block without a file id', () => {
+    const result = markdownToBlocks('![Remote](https://example.com/cat.png)')
+    expect(result).toEqual([
+      {
+        type: 'image',
+        properties: { source: [['https://example.com/cat.png']], title: [['Remote']] },
+      },
+    ])
+  })
+
+  test('image with an unbalanced parenthesis in its file name keeps the whole reference', () => {
+    const result = markdownToBlocks('![Local](<attachment:11111111-2222-3333-4444-555555555555:unbal_(1.png>)')
+    expect(result[0].properties?.source).toEqual([['attachment:11111111-2222-3333-4444-555555555555:unbal_(1.png']])
+  })
+
+  test('text around an image splits into sibling blocks', () => {
+    const result = markdownToBlocks('before ![Local](attachment:1111:cat.png) after')
+    expect(result.map((block) => block.type)).toEqual(['text', 'image', 'text'])
+    expect(result[0].properties?.title).toEqual([['before ']])
+    expect(result[2].properties?.title).toEqual([[' after']])
+  })
+
+  test('image on its own line does not leave an empty text block behind', () => {
+    const result = markdownToBlocks('![Local](attachment:1111:cat.png)')
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe('image')
+  })
+
+  test('whitespace between adjacent images does not become a text block', () => {
+    const result = markdownToBlocks('![One](attachment:1111:one.png) ![Two](attachment:2222:two.png)')
+    expect(result.map((block) => block.type)).toEqual(['image', 'image'])
+  })
 })

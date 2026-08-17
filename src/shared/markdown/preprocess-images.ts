@@ -3,6 +3,10 @@ import nodePath from 'node:path'
 
 const IMAGE_PATTERN = /!\[([^\]]*)\]\(([^)]+?)(?:\s+"([^"]*)")?\)/g
 
+// http:, https:, data:, and the attachment: reference an upload already resolved to. A bare Windows
+// drive letter is one character, so requiring two keeps `C:\photo.png` a local path.
+const URI_SCHEME_PATTERN = /^[a-z][a-z0-9+.-]+:/i
+
 export async function preprocessMarkdownImages(
   markdown: string,
   uploadFn: (filePath: string) => Promise<string>,
@@ -16,13 +20,13 @@ export async function preprocessMarkdownImages(
   let result = markdown
 
   for (const match of matches) {
-    const imagePath = match[2]
+    const imagePath = unwrapDestination(match[2].trim())
 
     // Skip empty paths
     if (!imagePath.trim()) continue
 
-    // Skip remote URLs
-    if (imagePath.includes('://')) continue
+    // Skip anything that is not a local path, including references a previous pass already uploaded
+    if (URI_SCHEME_PATTERN.test(imagePath)) continue
 
     const resolvedPath = nodePath.resolve(basePath, imagePath)
 
@@ -38,9 +42,26 @@ export async function preprocessMarkdownImages(
 
     const title = match[3]
     const originalText = match[0]
-    const replacement = title ? `![${match[1]}](${uploadedUrl} "${title}")` : `![${match[1]}](${uploadedUrl})`
-    result = result.replace(originalText, replacement)
+    const destination = formatDestination(uploadedUrl)
+    const replacement = title ? `![${match[1]}](${destination} "${title}")` : `![${match[1]}](${destination})`
+    // A replacer function keeps `$&` and friends from being expanded out of a file name.
+    result = result.replace(originalText, () => replacement)
   }
 
   return result
+}
+
+// Notion keeps parentheses in an uploaded file name, so `weird (1.png` comes back as
+// `weird_(1.png`. A bare destination only allows balanced parentheses, so that name would stop the
+// image parsing early; angle brackets keep it in one piece.
+function formatDestination(value: string): string {
+  if (!/[\s()<>]/.test(value)) return value
+  return `<${value.replace(/[<>\\]/g, '\\$&')}>`
+}
+
+// Markdown lets a destination be wrapped in angle brackets, which is how a local path containing
+// spaces is written. Unwrap it so what follows sees the value itself.
+function unwrapDestination(value: string): string {
+  if (!value.startsWith('<') || !value.endsWith('>')) return value
+  return value.slice(1, -1).replace(/\\([<>\\])/g, '$1')
 }
