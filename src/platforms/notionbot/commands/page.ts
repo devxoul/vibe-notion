@@ -160,9 +160,10 @@ export async function handlePageUpdate(
     throw new Error('No updates provided. Use --set or --replace-content with --markdown')
   }
 
+  let updatedPage: Record<string, unknown> | undefined
   if (hasPropertyUpdates) {
     const page = (await client.pages.retrieve({ page_id: pageId })) as Record<string, unknown>
-    await client.request({
+    updatedPage = await client.request<Record<string, unknown>>({
       path: `pages/${pageId}`,
       method: 'patch',
       body: { properties: buildPropertyUpdates(page, set) },
@@ -207,6 +208,10 @@ export async function handlePageUpdate(
     }
   }
 
+  if (updatedPage && !args.replaceContent) {
+    return formatPage(updatedPage)
+  }
+
   const page = await client.pages.retrieve({ page_id: pageId })
   return formatPage(page as Record<string, unknown>)
 }
@@ -223,7 +228,8 @@ function buildPropertyUpdates(page: Record<string, unknown>, updates: Record<str
     if (!property) {
       throw new Error(`Property "${name}" was not found on the page. Use page get to inspect property names.`)
     }
-    serialized[property.name] = serializePropertyValue(property.type, value)
+    const propertyKey = property.id === name ? name : property.name
+    serialized[propertyKey] = serializePropertyValue(property.type, value)
   }
   return serialized
 }
@@ -231,7 +237,7 @@ function buildPropertyUpdates(page: Record<string, unknown>, updates: Record<str
 function findPageProperty(
   properties: Record<string, unknown>,
   name: string,
-): { name: string; type: string } | undefined {
+): { name: string; id?: string; type: string } | undefined {
   const direct = properties[name]
   const match = direct
     ? ([name, direct] as const)
@@ -243,8 +249,15 @@ function findPageProperty(
   if (!match) return undefined
   const property = match[1]
   if (!property || typeof property !== 'object' || Array.isArray(property)) return undefined
-  const type = (property as Record<string, unknown>).type
-  return typeof type === 'string' ? { name: match[0], type } : undefined
+  const propertyRecord = property as Record<string, unknown>
+  const type = propertyRecord.type
+  return typeof type === 'string'
+    ? {
+        name: match[0],
+        id: typeof propertyRecord.id === 'string' ? propertyRecord.id : undefined,
+        type,
+      }
+    : undefined
 }
 
 function serializePropertyValue(type: string, value: string): unknown {

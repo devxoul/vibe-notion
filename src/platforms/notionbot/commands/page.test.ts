@@ -83,6 +83,15 @@ describe('page commands', () => {
     mockBlockChildrenList.mockReset()
     mockBlockDelete.mockReset()
     mockRequest.mockReset()
+    mockRequest.mockResolvedValue({
+      id: 'page-123',
+      object: 'page',
+      url: 'https://notion.so/page-123',
+      archived: false,
+      last_edited_time: '2024-01-01T00:00:00.000Z',
+      parent: { type: 'page_id', page_id: 'parent-1' },
+      properties: {},
+    })
     mockUploadFile.mockReset()
     mockUploadFile.mockImplementation(() =>
       Promise.resolve({
@@ -339,6 +348,8 @@ describe('page commands', () => {
           },
         },
       })
+      expect(mockRequest).toHaveBeenCalledTimes(1)
+      expect(mockPageRetrieve).toHaveBeenCalledTimes(1)
       const output = JSON.parse(consoleOutput[0])
       expect(output.id).toBe('page-123')
     })
@@ -378,7 +389,7 @@ describe('page commands', () => {
         method: 'patch',
         body: {
           properties: {
-            Status: {
+            'status-id': {
               status: { name: 'Done' },
             },
             Priority: {
@@ -387,6 +398,8 @@ describe('page commands', () => {
           },
         },
       })
+      expect(mockRequest).toHaveBeenCalledTimes(1)
+      expect(mockPageRetrieve).toHaveBeenCalledTimes(1)
     })
 
     test('serializes primitive property values using the page schema', async () => {
@@ -402,12 +415,24 @@ describe('page commands', () => {
           Estimate: { id: 'estimate-id', type: 'number', number: 1 },
           Done: { id: 'done-id', type: 'checkbox', checkbox: false },
           Due: { id: 'due-id', type: 'date', date: null },
+          DueTime: { id: 'due-time-id', type: 'date', date: null },
         },
       })
 
       // When
       await pageCommand.parseAsync(
-        ['update', 'page-123', '--set', 'Estimate=3', '--set', 'Done=true', '--set', 'Due=2026-08-24'],
+        [
+          'update',
+          'page-123',
+          '--set',
+          'Estimate=3',
+          '--set',
+          'Done=false',
+          '--set',
+          'Due=2026-08-24',
+          '--set',
+          'DueTime=2026-08-24T14:30:00+09:00',
+        ],
         { from: 'user' },
       )
 
@@ -418,11 +443,13 @@ describe('page commands', () => {
         body: {
           properties: {
             Estimate: { number: 3 },
-            Done: { checkbox: true },
+            Done: { checkbox: false },
             Due: { date: { start: '2026-08-24' } },
+            DueTime: { date: { start: '2026-08-24T14:30:00+09:00' } },
           },
         },
       })
+      expect(mockRequest).toHaveBeenCalledTimes(1)
     })
 
     test('serializes text, list, link, people, and relation properties', async () => {
@@ -438,6 +465,7 @@ describe('page commands', () => {
           Title: { id: 'title-id', type: 'title', title: [] },
           Description: { id: 'description-id', type: 'rich_text', rich_text: [] },
           Tags: { id: 'tags-id', type: 'multi_select', multi_select: [] },
+          JsonTags: { id: 'json-tags-id', type: 'multi_select', multi_select: [] },
           Website: { id: 'website-id', type: 'url', url: null },
           Email: { id: 'email-id', type: 'email', email: null },
           Phone: { id: 'phone-id', type: 'phone_number', phone_number: null },
@@ -457,6 +485,8 @@ describe('page commands', () => {
           'Description=Ready',
           '--set',
           'Tags=alpha,beta',
+          '--set',
+          'JsonTags=["alpha","beta"]',
           '--set',
           'Website=https://example.com',
           '--set',
@@ -480,6 +510,7 @@ describe('page commands', () => {
             Title: { title: [{ type: 'text', text: { content: 'Release notes' } }] },
             Description: { rich_text: [{ type: 'text', text: { content: 'Ready' } }] },
             Tags: { multi_select: [{ name: 'alpha' }, { name: 'beta' }] },
+            JsonTags: { multi_select: [{ name: 'alpha' }, { name: 'beta' }] },
             Website: { url: 'https://example.com' },
             Email: { email: 'owner@example.com' },
             Phone: { phone_number: '+821012345678' },
@@ -488,6 +519,7 @@ describe('page commands', () => {
           },
         },
       })
+      expect(mockRequest).toHaveBeenCalledTimes(1)
     })
 
     test('clears nullable properties with empty values', async () => {
@@ -523,6 +555,7 @@ describe('page commands', () => {
           },
         },
       })
+      expect(mockRequest).toHaveBeenCalledTimes(1)
     })
 
     test('rejects invalid property updates before sending a patch', async () => {
@@ -544,9 +577,19 @@ describe('page commands', () => {
           error: 'Invalid date value',
         },
         {
+          properties: { Due: { id: 'due-id', type: 'date', date: null } },
+          update: 'Due=2026-02-30',
+          error: 'Invalid date value',
+        },
+        {
           properties: { Tags: { id: 'tags-id', type: 'multi_select', multi_select: [] } },
           update: 'Tags=["broken"',
           error: 'Invalid list value',
+        },
+        {
+          properties: { Tags: { id: 'tags-id', type: 'multi_select', multi_select: [] } },
+          update: 'Tags=[1]',
+          error: 'Expected a list of strings',
         },
         {
           properties: { Formula: { id: 'formula-id', type: 'formula', formula: { string: 'x' } } },
@@ -558,12 +601,19 @@ describe('page commands', () => {
           update: 'DoesNotExist=x',
           error: 'was not found on the page',
         },
+        {
+          properties: undefined,
+          update: 'Anything=x',
+          error: 'Could not read page properties',
+        },
       ]
 
       for (const testCase of cases) {
         mockPageRetrieve.mockReset()
         mockPageRetrieve.mockResolvedValue({ properties: testCase.properties })
         mockRequest.mockReset()
+        const outputStart = consoleOutput.length
+        const errorStart = consoleErrors.length
 
         // When
         try {
@@ -572,8 +622,32 @@ describe('page commands', () => {
 
         // Then
         expect(mockRequest).not.toHaveBeenCalled()
-        expect([...consoleOutput, ...consoleErrors].join('\n')).toContain(testCase.error)
+        expect([...consoleOutput.slice(outputStart), ...consoleErrors.slice(errorStart)].join('\n')).toContain(
+          testCase.error,
+        )
       }
+    })
+
+    test('does not send a partial patch when one property update is invalid', async () => {
+      // Given
+      mockPageRetrieve.mockResolvedValue({
+        properties: {
+          Estimate: { id: 'estimate-id', type: 'number', number: 1 },
+          Done: { id: 'done-id', type: 'checkbox', checkbox: false },
+        },
+      })
+      mockRequest.mockReset()
+
+      // When
+      try {
+        await pageCommand.parseAsync(['update', 'page-123', '--set', 'Estimate=3', '--set', 'Done=maybe'], {
+          from: 'user',
+        })
+      } catch {}
+
+      // Then
+      expect(mockRequest).not.toHaveBeenCalled()
+      expect([...consoleOutput, ...consoleErrors].join('\n')).toContain('Invalid checkbox value')
     })
 
     test('replace-content deletes old blocks and appends new markdown', async () => {
