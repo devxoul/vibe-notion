@@ -13,6 +13,9 @@ import { handleError } from '@/shared/utils/error-handler'
 import { formatNotionId } from '@/shared/utils/id'
 import { formatOutput } from '@/shared/utils/output'
 
+const ISO_DATE_PATTERN =
+  /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)?)?$/
+
 async function getAction(rawPageId: string, options: { pretty?: boolean }): Promise<void> {
   const pageId = formatNotionId(rawPageId)
   try {
@@ -157,11 +160,13 @@ export async function handlePageUpdate(
     throw new Error('No updates provided. Use --set or --replace-content with --markdown')
   }
 
+  let updatedPage: Record<string, unknown> | undefined
   if (hasPropertyUpdates) {
-    await client.request({
+    const page = (await client.pages.retrieve({ page_id: pageId })) as Record<string, unknown>
+    updatedPage = await client.request<Record<string, unknown>>({
       path: `pages/${pageId}`,
       method: 'patch',
-      body: { properties: set },
+      body: { properties: buildPropertyUpdates(page, set) },
     })
   }
 
@@ -203,8 +208,146 @@ export async function handlePageUpdate(
     }
   }
 
+  if (updatedPage && !args.replaceContent) {
+    return formatPage(updatedPage)
+  }
+
   const page = await client.pages.retrieve({ page_id: pageId })
   return formatPage(page as Record<string, unknown>)
+}
+
+function buildPropertyUpdates(page: Record<string, unknown>, updates: Record<string, string>): Record<string, unknown> {
+  const pageProperties = page.properties
+  if (!pageProperties || typeof pageProperties !== 'object' || Array.isArray(pageProperties)) {
+    throw new Error('Could not read page properties. Use page get to inspect the page before updating it.')
+  }
+
+  const serialized: Record<string, unknown> = {}
+  for (const [name, value] of Object.entries(updates)) {
+    const property = findPageProperty(pageProperties as Record<string, unknown>, name)
+    if (!property) {
+      throw new Error(`Property "${name}" was not found on the page. Use page get to inspect property names.`)
+    }
+    const propertyKey = property.id === name ? name : property.name
+    serialized[propertyKey] = serializePropertyValue(property.type, value)
+  }
+  return serialized
+}
+
+function findPageProperty(
+  properties: Record<string, unknown>,
+  name: string,
+): { name: string; id?: string; type: string } | undefined {
+  const direct = properties[name]
+  const match = direct
+    ? ([name, direct] as const)
+    : Object.entries(properties).find(([propertyName, property]) => {
+        if (!property || typeof property !== 'object' || Array.isArray(property)) return false
+        return propertyName === name || (property as Record<string, unknown>).id === name
+      })
+
+  if (!match) return undefined
+  const property = match[1]
+  if (!property || typeof property !== 'object' || Array.isArray(property)) return undefined
+  const propertyRecord = property as Record<string, unknown>
+  const type = propertyRecord.type
+  return typeof type === 'string'
+    ? {
+        name: match[0],
+        id: typeof propertyRecord.id === 'string' ? propertyRecord.id : undefined,
+        type,
+      }
+    : undefined
+}
+
+function serializePropertyValue(type: string, value: string): unknown {
+  switch (type) {
+    case 'title':
+    case 'rich_text':
+      return { [type]: value ? [{ type: 'text', text: { content: value } }] : [] }
+    case 'number':
+      return { number: parseNumberValue(value) }
+    case 'checkbox':
+      return { checkbox: parseBooleanValue(value) }
+    case 'select':
+    case 'status':
+      return { [type]: value ? { name: value } : null }
+    case 'multi_select':
+      return { multi_select: parseListValue(value).map((name) => ({ name })) }
+    case 'date':
+      return { date: parseDateValue(value) }
+    case 'url':
+    case 'email':
+    case 'phone_number':
+      return { [type]: value || null }
+    case 'people':
+      return { people: parseListValue(value).map((id) => ({ id })) }
+    case 'relation':
+      return { relation: parseListValue(value).map((id) => ({ id })) }
+    default:
+      throw new Error(`Property type "${type}" cannot be updated with --set.`)
+  }
+}
+
+function parseNumberValue(value: string): number | null {
+  const normalized = value.trim()
+  if (!normalized) return null
+  if (!/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
+    throw new Error(`Invalid number value: "${value}"`)
+  }
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid number value: "${value}"`)
+  }
+  return parsed
+}
+
+function parseBooleanValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'true') return true
+  if (normalized === 'false') return false
+  throw new Error(`Invalid checkbox value: "${value}". Expected true or false.`)
+}
+
+function parseDateValue(value: string): { start: string } | null {
+  const normalized = value.trim()
+  if (!normalized) return null
+  if (!ISO_DATE_PATTERN.test(normalized)) {
+    throw new Error(`Invalid date value: "${value}". Expected an ISO 8601 date or datetime.`)
+  }
+
+  const [year, month, day] = normalized.slice(0, 10).split('-').map(Number)
+  const calendarDate = new Date(Date.UTC(year, month - 1, day))
+  if (
+    year < 1 ||
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
+  ) {
+    throw new Error(`Invalid date value: "${value}". Expected an ISO 8601 date or datetime.`)
+  }
+
+  return { start: normalized }
+}
+
+function parseListValue(value: string): string[] {
+  if (!value) return []
+  if (value.trimStart().startsWith('[')) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      throw new Error(`Invalid list value: "${value}". Expected a comma-separated list or JSON array.`)
+    }
+    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) {
+      throw new Error(`Invalid list value: "${value}". Expected a list of strings.`)
+    }
+    return parsed
+  }
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 export async function handlePageArchive(
