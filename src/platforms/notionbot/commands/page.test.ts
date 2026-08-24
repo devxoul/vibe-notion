@@ -379,6 +379,7 @@ describe('page commands', () => {
       })
 
       // When
+      // Property IDs remain stable when names change, so ID-based updates must preserve the ID in the PATCH payload.
       await pageCommand.parseAsync(['update', 'page-123', '--set', 'status-id=Done', '--set', 'Priority=High'], {
         from: 'user',
       })
