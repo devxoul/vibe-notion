@@ -317,7 +317,9 @@ describe('page commands', () => {
         archived: false,
         last_edited_time: '2024-01-01T00:00:00.000Z',
         parent: { type: 'page_id', page_id: 'parent-1' },
-        properties: {},
+        properties: {
+          Status: { id: 'status-id', type: 'status', status: { name: 'In Progress' } },
+        },
       })
 
       // When
@@ -331,7 +333,9 @@ describe('page commands', () => {
         method: 'patch',
         body: {
           properties: {
-            Status: 'Done',
+            Status: {
+              status: { name: 'Done' },
+            },
           },
         },
       })
@@ -357,7 +361,10 @@ describe('page commands', () => {
         archived: false,
         last_edited_time: '2024-01-01T00:00:00.000Z',
         parent: { type: 'page_id', page_id: 'parent-1' },
-        properties: {},
+        properties: {
+          Status: { id: 'status-id', type: 'status', status: { name: 'In Progress' } },
+          Priority: { id: 'priority-id', type: 'select', select: { name: 'Low' } },
+        },
       })
 
       // When
@@ -371,8 +378,48 @@ describe('page commands', () => {
         method: 'patch',
         body: {
           properties: {
-            Status: 'Done',
-            Priority: 'High',
+            Status: {
+              status: { name: 'Done' },
+            },
+            Priority: {
+              select: { name: 'High' },
+            },
+          },
+        },
+      })
+    })
+
+    test('serializes primitive property values using the page schema', async () => {
+      // Given
+      mockPageRetrieve.mockResolvedValue({
+        id: 'page-123',
+        object: 'page',
+        url: 'https://notion.so/page-123',
+        archived: false,
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        properties: {
+          Estimate: { id: 'estimate-id', type: 'number', number: 1 },
+          Done: { id: 'done-id', type: 'checkbox', checkbox: false },
+          Due: { id: 'due-id', type: 'date', date: null },
+        },
+      })
+
+      // When
+      await pageCommand.parseAsync(
+        ['update', 'page-123', '--set', 'Estimate=3', '--set', 'Done=true', '--set', 'Due=2026-08-24'],
+        { from: 'user' },
+      )
+
+      // Then
+      expect(mockRequest).toHaveBeenCalledWith({
+        path: 'pages/page-123',
+        method: 'patch',
+        body: {
+          properties: {
+            Estimate: { number: 3 },
+            Done: { checkbox: true },
+            Due: { date: { start: '2026-08-24' } },
           },
         },
       })

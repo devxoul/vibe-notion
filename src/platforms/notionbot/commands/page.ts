@@ -158,10 +158,11 @@ export async function handlePageUpdate(
   }
 
   if (hasPropertyUpdates) {
+    const page = (await client.pages.retrieve({ page_id: pageId })) as Record<string, unknown>
     await client.request({
       path: `pages/${pageId}`,
       method: 'patch',
-      body: { properties: set },
+      body: { properties: buildPropertyUpdates(page, set) },
     })
   }
 
@@ -205,6 +206,106 @@ export async function handlePageUpdate(
 
   const page = await client.pages.retrieve({ page_id: pageId })
   return formatPage(page as Record<string, unknown>)
+}
+
+function buildPropertyUpdates(page: Record<string, unknown>, updates: Record<string, string>): Record<string, unknown> {
+  const pageProperties = page.properties
+  if (!pageProperties || typeof pageProperties !== 'object' || Array.isArray(pageProperties)) {
+    throw new Error('Could not read page properties. Use page get to inspect the page before updating it.')
+  }
+
+  const serialized: Record<string, unknown> = {}
+  for (const [name, value] of Object.entries(updates)) {
+    const property = findPageProperty(pageProperties as Record<string, unknown>, name)
+    if (!property) {
+      throw new Error(`Property "${name}" was not found on the page. Use page get to inspect property names.`)
+    }
+    serialized[property.name] = serializePropertyValue(property.type, value)
+  }
+  return serialized
+}
+
+function findPageProperty(
+  properties: Record<string, unknown>,
+  name: string,
+): { name: string; type: string } | undefined {
+  const direct = properties[name]
+  const match = direct
+    ? ([name, direct] as const)
+    : Object.entries(properties).find(([propertyName, property]) => {
+        if (!property || typeof property !== 'object' || Array.isArray(property)) return false
+        return propertyName === name || (property as Record<string, unknown>).id === name
+      })
+
+  if (!match) return undefined
+  const property = match[1]
+  if (!property || typeof property !== 'object' || Array.isArray(property)) return undefined
+  const type = (property as Record<string, unknown>).type
+  return typeof type === 'string' ? { name: match[0], type } : undefined
+}
+
+function serializePropertyValue(type: string, value: string): unknown {
+  switch (type) {
+    case 'title':
+    case 'rich_text':
+      return { [type]: value ? [{ type: 'text', text: { content: value } }] : [] }
+    case 'number':
+      return { number: parseNumberValue(value) }
+    case 'checkbox':
+      return { checkbox: parseBooleanValue(value) }
+    case 'select':
+    case 'status':
+      return { [type]: value ? { name: value } : null }
+    case 'multi_select':
+      return { multi_select: parseListValue(value).map((name) => ({ name })) }
+    case 'date':
+      return { date: value ? { start: value } : null }
+    case 'url':
+    case 'email':
+    case 'phone_number':
+      return { [type]: value || null }
+    case 'people':
+      return { people: parseListValue(value).map((id) => ({ id })) }
+    case 'relation':
+      return { relation: parseListValue(value).map((id) => ({ id })) }
+    default:
+      throw new Error(`Property type "${type}" cannot be updated with --set.`)
+  }
+}
+
+function parseNumberValue(value: string): number | null {
+  if (!value) return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid number value: "${value}"`)
+  }
+  return parsed
+}
+
+function parseBooleanValue(value: string): boolean {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  throw new Error(`Invalid checkbox value: "${value}". Expected true or false.`)
+}
+
+function parseListValue(value: string): string[] {
+  if (!value) return []
+  if (value.trimStart().startsWith('[')) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      throw new Error(`Invalid list value: "${value}". Expected a comma-separated list or JSON array.`)
+    }
+    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) {
+      throw new Error(`Invalid list value: "${value}". Expected a list of strings.`)
+    }
+    return parsed
+  }
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 export async function handlePageArchive(
