@@ -24,10 +24,17 @@ Now you can run `vibe-notion` directly from your terminal.
 
 ### 3. Run Tests
 
-We use `bun test` for TDD:
+Run the full test suite with the project test script. It runs each test file in
+an isolated process so module mocks do not leak between test files:
 
 ```bash
-bun test src/
+bun run test
+```
+
+To run a single test file while developing, use Bun directly:
+
+```bash
+bun test src/path/to/example.test.ts
 ```
 
 ### 4. Linting and Formatting
