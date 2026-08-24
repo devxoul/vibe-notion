@@ -13,6 +13,9 @@ import { handleError } from '@/shared/utils/error-handler'
 import { formatNotionId } from '@/shared/utils/id'
 import { formatOutput } from '@/shared/utils/output'
 
+const ISO_DATE_PATTERN =
+  /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)?)?$/
+
 async function getAction(rawPageId: string, options: { pretty?: boolean }): Promise<void> {
   const pageId = formatNotionId(rawPageId)
   try {
@@ -259,7 +262,7 @@ function serializePropertyValue(type: string, value: string): unknown {
     case 'multi_select':
       return { multi_select: parseListValue(value).map((name) => ({ name })) }
     case 'date':
-      return { date: value ? { start: value } : null }
+      return { date: parseDateValue(value) }
     case 'url':
     case 'email':
     case 'phone_number':
@@ -274,8 +277,12 @@ function serializePropertyValue(type: string, value: string): unknown {
 }
 
 function parseNumberValue(value: string): number | null {
-  if (!value) return null
-  const parsed = Number(value)
+  const normalized = value.trim()
+  if (!normalized) return null
+  if (!/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
+    throw new Error(`Invalid number value: "${value}"`)
+  }
+  const parsed = Number(normalized)
   if (!Number.isFinite(parsed)) {
     throw new Error(`Invalid number value: "${value}"`)
   }
@@ -283,9 +290,31 @@ function parseNumberValue(value: string): number | null {
 }
 
 function parseBooleanValue(value: string): boolean {
-  if (value === 'true') return true
-  if (value === 'false') return false
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'true') return true
+  if (normalized === 'false') return false
   throw new Error(`Invalid checkbox value: "${value}". Expected true or false.`)
+}
+
+function parseDateValue(value: string): { start: string } | null {
+  const normalized = value.trim()
+  if (!normalized) return null
+  if (!ISO_DATE_PATTERN.test(normalized)) {
+    throw new Error(`Invalid date value: "${value}". Expected an ISO 8601 date or datetime.`)
+  }
+
+  const [year, month, day] = normalized.slice(0, 10).split('-').map(Number)
+  const calendarDate = new Date(Date.UTC(year, month - 1, day))
+  if (
+    year < 1 ||
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
+  ) {
+    throw new Error(`Invalid date value: "${value}". Expected an ISO 8601 date or datetime.`)
+  }
+
+  return { start: normalized }
 }
 
 function parseListValue(value: string): string[] {

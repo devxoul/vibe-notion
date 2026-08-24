@@ -368,7 +368,7 @@ describe('page commands', () => {
       })
 
       // When
-      await pageCommand.parseAsync(['update', 'page-123', '--set', 'Status=Done', '--set', 'Priority=High'], {
+      await pageCommand.parseAsync(['update', 'page-123', '--set', 'status-id=Done', '--set', 'Priority=High'], {
         from: 'user',
       })
 
@@ -423,6 +423,157 @@ describe('page commands', () => {
           },
         },
       })
+    })
+
+    test('serializes text, list, link, people, and relation properties', async () => {
+      // Given
+      mockPageRetrieve.mockResolvedValue({
+        id: 'page-123',
+        object: 'page',
+        url: 'https://notion.so/page-123',
+        archived: false,
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        properties: {
+          Title: { id: 'title-id', type: 'title', title: [] },
+          Description: { id: 'description-id', type: 'rich_text', rich_text: [] },
+          Tags: { id: 'tags-id', type: 'multi_select', multi_select: [] },
+          Website: { id: 'website-id', type: 'url', url: null },
+          Email: { id: 'email-id', type: 'email', email: null },
+          Phone: { id: 'phone-id', type: 'phone_number', phone_number: null },
+          Owners: { id: 'owners-id', type: 'people', people: [] },
+          Related: { id: 'related-id', type: 'relation', relation: [] },
+        },
+      })
+
+      // When
+      await pageCommand.parseAsync(
+        [
+          'update',
+          'page-123',
+          '--set',
+          'Title=Release notes',
+          '--set',
+          'Description=Ready',
+          '--set',
+          'Tags=alpha,beta',
+          '--set',
+          'Website=https://example.com',
+          '--set',
+          'Email=owner@example.com',
+          '--set',
+          'Phone=+821012345678',
+          '--set',
+          'Owners=user-1,user-2',
+          '--set',
+          'Related=page-1,page-2',
+        ],
+        { from: 'user' },
+      )
+
+      // Then
+      expect(mockRequest).toHaveBeenCalledWith({
+        path: 'pages/page-123',
+        method: 'patch',
+        body: {
+          properties: {
+            Title: { title: [{ type: 'text', text: { content: 'Release notes' } }] },
+            Description: { rich_text: [{ type: 'text', text: { content: 'Ready' } }] },
+            Tags: { multi_select: [{ name: 'alpha' }, { name: 'beta' }] },
+            Website: { url: 'https://example.com' },
+            Email: { email: 'owner@example.com' },
+            Phone: { phone_number: '+821012345678' },
+            Owners: { people: [{ id: 'user-1' }, { id: 'user-2' }] },
+            Related: { relation: [{ id: 'page-1' }, { id: 'page-2' }] },
+          },
+        },
+      })
+    })
+
+    test('clears nullable properties with empty values', async () => {
+      // Given
+      mockPageRetrieve.mockResolvedValue({
+        id: 'page-123',
+        object: 'page',
+        url: 'https://notion.so/page-123',
+        archived: false,
+        last_edited_time: '2024-01-01T00:00:00.000Z',
+        parent: { type: 'page_id', page_id: 'parent-1' },
+        properties: {
+          Status: { id: 'status-id', type: 'status', status: { name: 'Done' } },
+          Estimate: { id: 'estimate-id', type: 'number', number: 3 },
+          Due: { id: 'due-id', type: 'date', date: { start: '2026-08-24' } },
+        },
+      })
+
+      // When
+      await pageCommand.parseAsync(['update', 'page-123', '--set', 'Status=', '--set', 'Estimate= ', '--set', 'Due='], {
+        from: 'user',
+      })
+
+      // Then
+      expect(mockRequest).toHaveBeenCalledWith({
+        path: 'pages/page-123',
+        method: 'patch',
+        body: {
+          properties: {
+            Status: { status: null },
+            Estimate: { number: null },
+            Due: { date: null },
+          },
+        },
+      })
+    })
+
+    test('rejects invalid property updates before sending a patch', async () => {
+      // Given
+      const cases = [
+        {
+          properties: { Estimate: { id: 'estimate-id', type: 'number', number: 1 } },
+          update: 'Estimate=0x10',
+          error: 'Invalid number value',
+        },
+        {
+          properties: { Done: { id: 'done-id', type: 'checkbox', checkbox: false } },
+          update: 'Done=maybe',
+          error: 'Invalid checkbox value',
+        },
+        {
+          properties: { Due: { id: 'due-id', type: 'date', date: null } },
+          update: 'Due=not-a-date',
+          error: 'Invalid date value',
+        },
+        {
+          properties: { Tags: { id: 'tags-id', type: 'multi_select', multi_select: [] } },
+          update: 'Tags=["broken"',
+          error: 'Invalid list value',
+        },
+        {
+          properties: { Formula: { id: 'formula-id', type: 'formula', formula: { string: 'x' } } },
+          update: 'Formula=x',
+          error: 'cannot be updated with --set',
+        },
+        {
+          properties: { Status: { id: 'status-id', type: 'status', status: { name: 'Done' } } },
+          update: 'DoesNotExist=x',
+          error: 'was not found on the page',
+        },
+      ]
+
+      for (const testCase of cases) {
+        mockPageRetrieve.mockReset()
+        mockPageRetrieve.mockResolvedValue({ properties: testCase.properties })
+        mockRequest.mockReset()
+
+        // When
+        try {
+          await pageCommand.parseAsync(['update', 'page-123', '--set', testCase.update], { from: 'user' })
+        } catch {}
+
+        // Then
+        expect(mockRequest).not.toHaveBeenCalled()
+        expect([...consoleOutput, ...consoleErrors].join('\n')).toContain(testCase.error)
+      }
     })
 
     test('replace-content deletes old blocks and appends new markdown', async () => {
