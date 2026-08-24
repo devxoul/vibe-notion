@@ -24,10 +24,10 @@ Now you can run `vibe-notion` directly from your terminal.
 
 ### 3. Run Tests
 
-We use `bun test` for TDD:
+We use `bun run test` for TDD:
 
 ```bash
-bun test src/
+bun run test
 ```
 
 ### 4. Linting and Formatting

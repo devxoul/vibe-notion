@@ -16,7 +16,7 @@ Runtime: Bun for development, Node.js-compatible output for npm distribution.
 bun install
 
 # Run all unit tests
-bun test
+bun run test
 
 # Run all e2e tests
 bun test:e2e
