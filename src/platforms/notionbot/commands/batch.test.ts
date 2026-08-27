@@ -232,6 +232,57 @@ describe('notionbot batch command', () => {
     expect(getExitCode()).toBe(0)
   })
 
+  test('page.update deserializes object-valued set before updating the page', async () => {
+    // Given
+    const { NOTIONBOT_ACTION_REGISTRY } = await import('./batch')
+    const mockPageRetrieve = mock(async () => ({
+      id: 'page-1',
+      object: 'page',
+      url: 'https://notion.so/page-1',
+      archived: false,
+      last_edited_time: '2024-01-01T00:00:00.000Z',
+      parent: { type: 'page_id', page_id: 'parent-1' },
+      properties: {
+        Status: { id: 'status-id', type: 'status', status: { name: 'In Progress' } },
+      },
+    }))
+    const mockRequest = mock(async () => ({
+      id: 'page-1',
+      object: 'page',
+      url: 'https://notion.so/page-1',
+      archived: false,
+      last_edited_time: '2024-01-01T00:00:00.000Z',
+      parent: { type: 'page_id', page_id: 'parent-1' },
+      properties: {
+        Status: { id: 'status-id', type: 'status', status: { name: 'Done' } },
+      },
+    }))
+    const client = {
+      pages: { retrieve: mockPageRetrieve },
+      request: mockRequest,
+    }
+    const args = normalizeOperationArgs({
+      action: 'page.update',
+      page_id: 'page-1',
+      set: { Status: 'Done' },
+    })
+
+    // When
+    await NOTIONBOT_ACTION_REGISTRY['page.update'](client as any, args)
+
+    // Then
+    expect(mockRequest).toHaveBeenCalledWith({
+      path: 'pages/page-1',
+      method: 'patch',
+      body: {
+        properties: {
+          Status: { status: { name: 'Done' } },
+        },
+      },
+    })
+    expect(mockPageRetrieve).toHaveBeenCalledTimes(1)
+  })
+
   test('block.upload action calls upload handler with correct args', async () => {
     const handlers = createMockHandlers()
     const { deps, output, getExitCode } = createDefaultDeps(handlers)
