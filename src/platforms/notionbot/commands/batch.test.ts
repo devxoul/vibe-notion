@@ -232,6 +232,116 @@ describe('notionbot batch command', () => {
     expect(getExitCode()).toBe(0)
   })
 
+  test('page.update deserializes object-valued set through the batch entrypoint', async () => {
+    // Given
+    const mockPageRetrieve = mock(async () => ({
+      id: 'page-1',
+      object: 'page',
+      url: 'https://notion.so/page-1',
+      archived: false,
+      last_edited_time: '2024-01-01T00:00:00.000Z',
+      parent: { type: 'page_id', page_id: 'parent-1' },
+      properties: {
+        Status: { id: 'status-id', type: 'status', status: { name: 'In Progress' } },
+      },
+    }))
+    const mockRequest = mock(async () => ({
+      id: 'page-1',
+      object: 'page',
+      url: 'https://notion.so/page-1',
+      archived: false,
+      last_edited_time: '2024-01-01T00:00:00.000Z',
+      parent: { type: 'page_id', page_id: 'parent-1' },
+      properties: {
+        Status: { id: 'status-id', type: 'status', status: { name: 'Done' } },
+      },
+    }))
+    const client = {
+      pages: { retrieve: mockPageRetrieve },
+      request: mockRequest,
+    }
+    const output: string[] = []
+    let exitCode: number | undefined
+    const { executeBatch } = await import('./batch')
+
+    // When
+    await executeBatch(
+      '[{"action":"page.update","page_id":"page-1","set":{"Status":"Done"}}]',
+      {},
+      {
+        getClientOrThrow: () => client as any,
+        log: (...args: unknown[]) => output.push(args.map(String).join(' ')),
+        exit: (code?: number): undefined => {
+          exitCode = code
+          return undefined
+        },
+      },
+    )
+
+    // Then
+    expect(mockRequest).toHaveBeenCalledWith({
+      path: 'pages/page-1',
+      method: 'patch',
+      body: {
+        properties: {
+          Status: { status: { name: 'Done' } },
+        },
+      },
+    })
+    expect(mockPageRetrieve).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(output[0]).results[0].success).toBe(true)
+    expect(exitCode).toBe(0)
+  })
+
+  test('page.update reports invalid set values without calling Notion', async () => {
+    // Given
+    const cases = ['not-json', [{ Status: 'Done' }], 1, { Status: 1 }]
+    const { executeBatch } = await import('./batch')
+
+    for (const set of cases) {
+      const mockPageRetrieve = mock(async () => ({}))
+      const mockRequest = mock(async () => ({}))
+      const output: string[] = []
+      let exitCode: number | undefined
+
+      // When
+      await executeBatch(
+        JSON.stringify([{ action: 'page.update', page_id: 'page-1', set }]),
+        {},
+        {
+          getClientOrThrow: () =>
+            ({
+              pages: { retrieve: mockPageRetrieve },
+              request: mockRequest,
+            }) as any,
+          log: (...args: unknown[]) => output.push(args.map(String).join(' ')),
+          exit: (code?: number): undefined => {
+            exitCode = code
+            return undefined
+          },
+        },
+      )
+
+      // Then
+      expect(JSON.parse(output[0])).toEqual({
+        results: [
+          {
+            index: 0,
+            action: 'page.update',
+            success: false,
+            error: 'Invalid page.update set: expected a JSON object with string property values.',
+          },
+        ],
+        total: 1,
+        succeeded: 0,
+        failed: 1,
+      })
+      expect(exitCode).toBe(1)
+      expect(mockPageRetrieve).not.toHaveBeenCalled()
+      expect(mockRequest).not.toHaveBeenCalled()
+    }
+  })
+
   test('block.upload action calls upload handler with correct args', async () => {
     const handlers = createMockHandlers()
     const { deps, output, getExitCode } = createDefaultDeps(handlers)
