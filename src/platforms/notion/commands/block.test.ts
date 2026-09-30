@@ -636,7 +636,7 @@ describe('blockCommand', () => {
   describe('block append', () => {
     test('parses block definitions and creates blocks', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -698,7 +698,7 @@ describe('blockCommand', () => {
 
     test('calls saveTransactions with set and listAfter operations', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -773,7 +773,7 @@ describe('blockCommand', () => {
 
     test('errors on invalid JSON content', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
@@ -835,7 +835,7 @@ describe('blockCommand', () => {
 
     test('errors when block definition missing type', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
@@ -897,7 +897,7 @@ describe('blockCommand', () => {
 
     test('creates blocks from markdown string', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -972,7 +972,7 @@ describe('blockCommand', () => {
 
     test('persists an uploaded markdown image as an image block claiming its file id', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -1041,7 +1041,7 @@ describe('blockCommand', () => {
 
     test('preprocesses markdown images before converting blocks', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -1093,7 +1093,7 @@ describe('blockCommand', () => {
 
     test('skips markdown image preprocessing when markdown has no images', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -1141,7 +1141,7 @@ describe('blockCommand', () => {
     test('creates nested operations from markdown with sub-bullets', async () => {
       // Given
       let idCounter = 0
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => `block-${idCounter++}`)
@@ -1217,7 +1217,7 @@ describe('blockCommand', () => {
     test('parses JSON content with nested children', async () => {
       // Given
       let idCounter = 0
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => `block-${idCounter++}`)
@@ -1292,7 +1292,7 @@ describe('blockCommand', () => {
 
     test('errors when children is not an array in JSON content', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
@@ -1359,7 +1359,7 @@ describe('blockCommand', () => {
 
     test('creates blocks from markdown file', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -1418,7 +1418,7 @@ describe('blockCommand', () => {
 
     test('errors when both --markdown and --content provided', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
@@ -1487,7 +1487,7 @@ describe('blockCommand', () => {
 
     test('errors when markdown file does not exist', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
@@ -1553,7 +1553,7 @@ describe('blockCommand', () => {
 
     test('includes after in listAfter args when --after is provided', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -1612,7 +1612,7 @@ describe('blockCommand', () => {
     test('chains multiple appended blocks when --after is provided', async () => {
       // Given
       let idCounter = 0
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => `block-${idCounter++}`)
@@ -1669,9 +1669,56 @@ describe('blockCommand', () => {
       expect(listAfterOps[1].args).toEqual(expect.objectContaining({ id: 'block-1', after: 'block-0' }))
     })
 
+    test('relinks appended blocks that the parent content is missing', async () => {
+      // Given
+      let idCounter = 0
+      const mockInternalRequest = mockAppendInternalRequest({ unlinkedSaves: 1 })
+      mockAppendModules(mockInternalRequest, () => `block-${idCounter++}`)
+      const { handleBlockAppend } = await import('./block')
+
+      // When
+      const result = await handleBlockAppend('test-token', {
+        parent_id: 'parent-1',
+        after: 'sibling-1',
+        content: JSON.stringify([{ type: 'text' }, { type: 'text' }]),
+        workspaceId: 'space-123',
+      })
+
+      // Then
+      expect(result).toEqual({ created: ['block-0', 'block-1'] })
+      const saveCalls = mockInternalRequest.mock.calls.filter(([, endpoint]) => endpoint === 'saveTransactions')
+      expect(saveCalls.length).toBe(2)
+      const relinkOperations = (saveCalls[1][2] as { transactions: Array<{ operations: any[] }> }).transactions[0]
+        .operations
+      expect(relinkOperations.map((op) => [op.pointer.id, op.command, op.args])).toEqual([
+        ['parent-1', 'listRemove', { id: 'block-0' }],
+        ['parent-1', 'listAfter', { id: 'block-0', after: 'sibling-1' }],
+        ['parent-1', 'listRemove', { id: 'block-1' }],
+        ['parent-1', 'listAfter', { id: 'block-1', after: 'block-0' }],
+      ])
+    })
+
+    test('fails instead of reporting success when appended blocks stay unlinked', async () => {
+      // Given
+      let idCounter = 0
+      const mockInternalRequest = mockAppendInternalRequest({ unlinkedSaves: Infinity })
+      mockAppendModules(mockInternalRequest, () => `block-${idCounter++}`)
+      const { handleBlockAppend } = await import('./block')
+
+      // When
+      const append = handleBlockAppend('test-token', {
+        parent_id: 'parent-1',
+        content: JSON.stringify([{ type: 'text' }, { type: 'text' }]),
+        workspaceId: 'space-123',
+      })
+
+      // Then
+      await expect(append).rejects.toThrow('Blocks were created but not attached to parent parent-1: block-0, block-1')
+    })
+
     test('includes before in listBefore args when --before is provided', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'new-block-id')
@@ -1730,7 +1777,7 @@ describe('blockCommand', () => {
     test('chains multiple appended blocks with listAfter when --before is provided', async () => {
       // Given
       let idCounter = 0
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => `block-${idCounter++}`)
@@ -1791,7 +1838,7 @@ describe('blockCommand', () => {
 
     test('errors when both --after and --before are provided', async () => {
       // Given
-      const mockInternalRequest = mock(() => Promise.resolve({}))
+      const mockInternalRequest = mockAppendInternalRequest()
       const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
       const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
       const mockGenerateId = mock(() => 'mock-uuid')
@@ -3025,3 +3072,50 @@ describe('blockCommand', () => {
     })
   })
 })
+
+type SaveTransactionsBody = {
+  transactions: Array<{ operations: Array<{ command: string; path: string[]; args: { id?: string } }> }>
+}
+
+type SyncRecordValuesBody = { requests: Array<{ pointer: { id: string } }> }
+
+// Fakes Notion's parent `content` list. `unlinkedSaves` simulates saves that Notion accepts without linking the blocks.
+function mockAppendInternalRequest(options: { unlinkedSaves?: number } = {}) {
+  const linkedIds = new Set<string>()
+  let saveCount = 0
+  return mock(async (_token: string, endpoint: string, body?: unknown) => {
+    if (endpoint === 'saveTransactions') {
+      saveCount++
+      if (saveCount <= (options.unlinkedSaves ?? 0)) return {}
+      for (const transaction of (body as SaveTransactionsBody).transactions) {
+        for (const op of transaction.operations) {
+          if (op.path[0] === 'content' && (op.command === 'listAfter' || op.command === 'listBefore') && op.args.id) {
+            linkedIds.add(op.args.id)
+          }
+        }
+      }
+      return {}
+    }
+    if (endpoint === 'syncRecordValues') {
+      const id = (body as SyncRecordValuesBody).requests[0].pointer.id
+      return { recordMap: { block: { [id]: { value: { id, content: [...linkedIds] }, role: 'editor' } } } }
+    }
+    return {}
+  })
+}
+
+function mockAppendModules(internalRequest: ReturnType<typeof mockAppendInternalRequest>, generateId: () => string) {
+  mock.module('../client', () => ({ internalRequest }))
+  mock.module('./helpers', () => ({
+    getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' })),
+    generateId: mock(generateId),
+    resolveSpaceId: mock(() => Promise.resolve('space-123')),
+    resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+    resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+    resolveBacklinkUsers: mock(async () => ({})),
+    resolveDefaultTeamId: mock(async () => undefined),
+    ensureWorkspaceContext: mock(async () => ({ workspaceId: 'space-123', tokenV2: 'test-token' })),
+    resolveWorkspaceFromTarget: mock(async () => ({ workspaceId: 'space-mock', tokenV2: 'test-token' })),
+    getAccountTokens: mock(() => [{ token_v2: 'test-token' }]),
+  }))
+}
