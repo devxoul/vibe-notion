@@ -2728,4 +2728,59 @@ describe('PageCommand', () => {
     expect(result.type).toBe('page')
     expect(result.title).toBe('V3 New Page')
   })
+
+  for (const [label, wrap] of [
+    ['flat', (value: Record<string, unknown>) => ({ value, role: 'editor' })],
+    ['wrapped', (value: Record<string, unknown>) => ({ spaceId: 'space-123', value: { value, role: 'editor' } })],
+  ] as const) {
+    test(`page properties resolves schema names for ${label} collection records`, async () => {
+      // Given
+      const collection = {
+        id: 'coll-1',
+        schema: {
+          title: { name: 'Name', type: 'title' },
+          brnd: { name: 'Brand', type: 'text' },
+        },
+      }
+      mock.module('../client', () => ({
+        internalRequest: mock(async (_tokenV2: string, endpoint: string, body: any) => {
+          if (endpoint !== 'syncRecordValues') return {}
+          const table = body.requests[0].pointer.table
+          if (table === 'collection') {
+            return { recordMap: { collection: { 'coll-1': wrap(collection) } } }
+          }
+          return {
+            recordMap: {
+              block: {
+                'row-1': {
+                  value: {
+                    id: 'row-1',
+                    type: 'page',
+                    parent_table: 'collection',
+                    parent_id: 'coll-1',
+                    properties: { title: [['Pi Zero']], brnd: [['Raspberry']] },
+                  },
+                  role: 'editor',
+                },
+              },
+            },
+          }
+        }),
+      }))
+      mock.module('./helpers', () => ({
+        resolveAndSetActiveUserId: mock(async () => {}),
+      }))
+
+      // When
+      const { handlePageProperties } = await import('./page')
+      const result = (await handlePageProperties('test-token', {
+        page_id: 'row-1',
+        workspaceId: 'space-123',
+        workspaceSource: 'explicit',
+      })) as { properties: Record<string, unknown> }
+
+      // Then
+      expect(Object.keys(result.properties).sort()).toEqual(['Brand', 'Name'])
+    })
+  }
 })
