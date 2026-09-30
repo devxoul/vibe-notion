@@ -478,17 +478,40 @@ function serializeRowProperties(
   return properties
 }
 
+type SchemaPropertyUpdateOperation = {
+  pointer: { table: 'collection'; id: string; spaceId: string }
+  command: 'updateCollectionPropertySchema'
+  path: string[]
+  args: {
+    primitiveOp: { command: 'update'; args: Record<string, CollectionProperty | null> }
+    additionalPropertyIds: string[]
+  }
+}
+
+// Notion rejects plain `set`/`update` on `schema` with a 400; schema edits must go
+// through the same dedicated command the web client uses.
+function buildSchemaPropertyUpdateOperation(
+  collectionId: string,
+  spaceId: string,
+  properties: Record<string, CollectionProperty | null>,
+): SchemaPropertyUpdateOperation {
+  return {
+    pointer: { table: 'collection', id: collectionId, spaceId },
+    command: 'updateCollectionPropertySchema',
+    path: ['schema'],
+    args: {
+      primitiveOp: { command: 'update', args: properties },
+      additionalPropertyIds: [],
+    },
+  }
+}
+
 function buildSchemaOptionUpdates(
   optionValuesToRegister: Record<string, string[]>,
   schema: CollectionSchema,
   collectionId: string,
   spaceId: string,
-): Array<{
-  pointer: { table: 'collection'; id: string; spaceId: string }
-  command: 'update'
-  path: string[]
-  args: CollectionProperty & { options: unknown[] }
-}> {
+): SchemaPropertyUpdateOperation[] {
   return Object.entries(optionValuesToRegister).map(([propId, values]) => {
     const schemaEntry = schema[propId]
     const existingOptions = Array.isArray(schemaEntry.options) ? schemaEntry.options : []
@@ -498,15 +521,9 @@ function buildSchemaOptionUpdates(
       value,
     }))
 
-    return {
-      pointer: { table: 'collection' as const, id: collectionId, spaceId },
-      command: 'update' as const,
-      path: ['schema', propId],
-      args: {
-        ...schemaEntry,
-        options: [...existingOptions, ...newOptions],
-      },
-    }
+    return buildSchemaPropertyUpdateOperation(collectionId, spaceId, {
+      [propId]: { ...schemaEntry, options: [...existingOptions, ...newOptions] },
+    })
   })
 }
 
@@ -1048,16 +1065,22 @@ function buildSerializedInputProperties(
   return serializeRowProperties(parsed, schema, nameToId, registerOption)
 }
 
+// Notion rejects plain `set` on non-title row properties with a 400.
 function buildRowPropertySetOperations(
   rowId: string,
   spaceId: string,
   serializedProps: Record<string, unknown>,
-): Array<{ pointer: { table: 'block'; id: string; spaceId: string }; command: 'set'; path: string[]; args: unknown }> {
+): Array<{
+  pointer: { table: 'block'; id: string; spaceId: string }
+  command: 'updateBlockPropertyValue'
+  path: string[]
+  args: { primitiveOp: { command: 'set'; args: unknown } }
+}> {
   return Object.entries(serializedProps).map(([propId, value]) => ({
     pointer: { table: 'block' as const, id: rowId, spaceId },
-    command: 'set' as const,
+    command: 'updateBlockPropertyValue' as const,
     path: ['properties', propId],
-    args: value,
+    args: { primitiveOp: { command: 'set' as const, args: value } },
   }))
 }
 
@@ -1378,13 +1401,15 @@ export async function handleDatabaseUpdate(
   }
 
   const spaceId = await resolveSpaceId(tokenV2, parentId)
-  const updateArgs: {
-    name?: string[][]
-    schema?: CollectionSchema
-  } = {}
+  const operations: unknown[] = []
 
   if (args.title) {
-    updateArgs.name = [[args.title]]
+    operations.push({
+      pointer: { table: 'collection', id: collectionId, spaceId },
+      command: 'update',
+      path: [],
+      args: { name: [[args.title]] },
+    })
   }
 
   if (args.properties) {
@@ -1410,25 +1435,12 @@ export async function handleDatabaseUpdate(
     }
     resolveRelationProperties(resolvedProperties, mergedSchema, spaceId)
     await resolveRollupReferences(resolvedProperties, mergedSchema, tokenV2)
-    updateArgs.schema = mergedSchema
+    operations.push(buildSchemaPropertyUpdateOperation(collectionId, spaceId, resolvedProperties))
   }
 
   await internalRequest(tokenV2, 'saveTransactions', {
     requestId: generateId(),
-    transactions: [
-      {
-        id: generateId(),
-        spaceId,
-        operations: [
-          {
-            pointer: { table: 'collection', id: collectionId, spaceId },
-            command: 'update',
-            path: [],
-            args: updateArgs,
-          },
-        ],
-      },
-    ],
+    transactions: [{ id: generateId(), spaceId, operations }],
   })
 
   const updated = await fetchCollection(tokenV2, collectionId)
@@ -1482,15 +1494,10 @@ export async function handleDatabaseDeleteProperty(
           {
             pointer: { table: 'collection', id: collectionId, spaceId },
             path: ['deleted_schema'],
-            command: 'update',
-            args: { [propId]: deletedProp },
+            command: 'updateCollectionDeletedPropertySchema',
+            args: { primitiveOp: { command: 'update', args: { [propId]: deletedProp } } },
           },
-          {
-            pointer: { table: 'collection', id: collectionId, spaceId },
-            path: ['schema'],
-            command: 'update',
-            args: { [propId]: null },
-          },
+          buildSchemaPropertyUpdateOperation(collectionId, spaceId, { [propId]: null }),
         ],
       },
     ],
