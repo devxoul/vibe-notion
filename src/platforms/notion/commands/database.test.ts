@@ -1432,7 +1432,7 @@ describe('database update', () => {
     })
   })
 
-  test('merges new properties into existing schema', async () => {
+  test('sends new properties via updateCollectionPropertySchema', async () => {
     mock.restore()
     // Given
     const mockGetResponse = {
@@ -1530,17 +1530,23 @@ describe('database update', () => {
       console.log = originalLog
     }
 
-    // Then — saveTransactions called with merged schema
+    // Then — only the changed property is sent via updateCollectionPropertySchema
     const saveTransactionCall = mockInternalRequest.mock.calls.find(
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveTransactionCall).toBeDefined()
-    const args = (saveTransactionCall![2] as any).transactions[0].operations[0].args
-    expect(args.schema).toEqual({
-      title: { name: 'Name', type: 'title' },
-      prop1: { name: 'Status', type: 'select' },
-      prop2: { name: 'Priority', type: 'select' },
-    })
+    const operations = (saveTransactionCall![2] as any).transactions[0].operations
+    expect(operations).toEqual([
+      {
+        pointer: { table: 'collection', id: 'coll-1', spaceId: 'space-123' },
+        command: 'updateCollectionPropertySchema',
+        path: ['schema'],
+        args: {
+          primitiveOp: { command: 'update', args: { prop2: { name: 'Priority', type: 'select' } } },
+          additionalPropertyIds: [],
+        },
+      },
+    ])
   })
 
   test('resolves property names to existing schema keys when updating', async () => {
@@ -1638,13 +1644,8 @@ describe('database update', () => {
       (call) => (call as unknown[])[1] === 'saveTransactions',
     ) as unknown as [string, string, Record<string, unknown>] | undefined
     expect(saveTransactionCall).toBeDefined()
-    const args = (saveTransactionCall![2] as any).transactions[0].operations[0].args
-    expect(args.schema).toEqual({
-      title: { name: 'Name', type: 'title' },
-      aB1c: { name: '일정', type: 'text' },
-    })
-    // Must NOT have the property name as a separate key
-    expect(args.schema).not.toHaveProperty('일정')
+    const schemaUpdate = (saveTransactionCall![2] as any).transactions[0].operations[0].args.primitiveOp.args
+    expect(schemaUpdate).toEqual({ aB1c: { name: '일정', type: 'text' } })
   })
   test('outputs current collection when no options provided', async () => {
     mock.restore()
@@ -1828,12 +1829,14 @@ describe('database add-row', () => {
     }
 
     const operations = saveCall[2].transactions[0].operations
-    const schemaUpdate = operations.find(
-      (op) => Array.isArray(op.path) && op.path[0] === 'schema' && op.path[1] === 'prop1',
-    )
+    const schemaUpdate = operations.find((op) => op.command === 'updateCollectionPropertySchema')
     expect(schemaUpdate).toBeDefined()
 
-    const schemaArgs = schemaUpdate?.args as { options?: Array<{ value?: string; id?: string; color?: string }> }
+    const schemaArgs = (
+      schemaUpdate?.args as {
+        primitiveOp: { args: Record<string, { options?: Array<{ value?: string; id?: string; color?: string }> }> }
+      }
+    ).primitiveOp.args.prop1
     expect(schemaArgs.options?.map((option) => option.value)).toEqual(['Existing', 'In Progress'])
 
     const newOption = schemaArgs.options?.find((option) => option.value === 'In Progress')
@@ -1951,12 +1954,14 @@ describe('database add-row', () => {
     }
 
     const operations = saveCall[2].transactions[0].operations
-    const schemaUpdate = operations.find(
-      (op) => Array.isArray(op.path) && op.path[0] === 'schema' && op.path[1] === 'prop1',
-    )
+    const schemaUpdate = operations.find((op) => op.command === 'updateCollectionPropertySchema')
     expect(schemaUpdate).toBeDefined()
 
-    const schemaArgs = schemaUpdate?.args as { options?: Array<{ value?: string; color?: string }> }
+    const schemaArgs = (
+      schemaUpdate?.args as {
+        primitiveOp: { args: Record<string, { options?: Array<{ value?: string; color?: string }> }> }
+      }
+    ).primitiveOp.args.prop1
     expect(schemaArgs.options?.map((option) => option.value)).toEqual(['Existing', 'Alpha', 'Beta'])
     expect(schemaArgs.options?.[1]?.color).toBe('gray')
     expect(schemaArgs.options?.[2]?.color).toBe('brown')
@@ -2072,9 +2077,7 @@ describe('database add-row', () => {
     }
 
     const operations = saveCall[2].transactions[0].operations
-    const schemaOperations = operations.filter(
-      (op) => Array.isArray(op.path) && op.path[0] === 'schema' && op.path[1] === 'prop1',
-    )
+    const schemaOperations = operations.filter((op) => op.command === 'updateCollectionPropertySchema')
     expect(schemaOperations.length).toBe(0)
     expect(output.length).toBeGreaterThan(0)
   })
@@ -2187,12 +2190,14 @@ describe('database add-row', () => {
     }
 
     const operations = saveCall[2].transactions[0].operations
-    const schemaUpdate = operations.find(
-      (op) => Array.isArray(op.path) && op.path[0] === 'schema' && op.path[1] === 'prop1',
-    )
+    const schemaUpdate = operations.find((op) => op.command === 'updateCollectionPropertySchema')
     expect(schemaUpdate).toBeDefined()
 
-    const schemaArgs = schemaUpdate?.args as { options?: Array<{ value?: string; color?: string }> }
+    const schemaArgs = (
+      schemaUpdate?.args as {
+        primitiveOp: { args: Record<string, { options?: Array<{ value?: string; color?: string }> }> }
+      }
+    ).primitiveOp.args.prop1
     expect(schemaArgs.options?.map((option) => option.value)).toEqual(['North'])
     expect(schemaArgs.options?.[0]?.color).toBe('default')
     expect(output.length).toBeGreaterThan(0)
@@ -2316,14 +2321,14 @@ describe('database update-row', () => {
 
     const operations = saveCall[2].transactions[0].operations
     expect(operations[0]).toMatchObject({
-      command: 'update',
-      path: ['schema', 'prop1'],
+      command: 'updateCollectionPropertySchema',
+      path: ['schema'],
     })
-    expect(operations[1]).toMatchObject({
+    expect(operations[1]).toEqual({
       pointer: { table: 'block', id: 'row-1', spaceId: 'space-1' },
-      command: 'set',
+      command: 'updateBlockPropertyValue',
       path: ['properties', 'prop1'],
-      args: [['Active']],
+      args: { primitiveOp: { command: 'set', args: [['Active']] } },
     })
     expect(output.length).toBeGreaterThan(0)
   })
@@ -2429,8 +2434,8 @@ describe('database update-row', () => {
       (op) => Array.isArray(op.path) && op.path[0] === 'properties' && op.path[1] === 'rel1',
     )
     expect(relationSet).toMatchObject({
-      command: 'set',
-      args: [['‣', [['p', 'page-abc']]]],
+      command: 'updateBlockPropertyValue',
+      args: { primitiveOp: { command: 'set', args: [['‣', [['p', 'page-abc']]]] } },
     })
     expect(output.length).toBeGreaterThan(0)
   })
@@ -2532,11 +2537,13 @@ describe('database update-row', () => {
     }
 
     const operations = saveCall[2].transactions[0].operations
-    const schemaIndex = operations.findIndex(
-      (op) => Array.isArray(op.path) && op.command === 'update' && op.path[0] === 'schema',
-    )
+    const schemaIndex = operations.findIndex((op) => op.command === 'updateCollectionPropertySchema')
     const setIndex = operations.findIndex(
-      (op) => Array.isArray(op.path) && op.command === 'set' && op.path[0] === 'properties' && op.path[1] === 'prop1',
+      (op) =>
+        Array.isArray(op.path) &&
+        op.command === 'updateBlockPropertyValue' &&
+        op.path[0] === 'properties' &&
+        op.path[1] === 'prop1',
     )
     expect(schemaIndex).toBeGreaterThanOrEqual(0)
     expect(setIndex).toBeGreaterThanOrEqual(0)
@@ -2652,9 +2659,18 @@ describe('database update-row', () => {
     const operations = saveCall[2].transactions[0].operations
     expect(operations).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ path: ['properties', 'text1'], args: [['hello']] }),
-        expect.objectContaining({ path: ['properties', 'num1'], args: [['42']] }),
-        expect.objectContaining({ path: ['properties', 'check1'], args: [['Yes']] }),
+        expect.objectContaining({
+          path: ['properties', 'text1'],
+          args: { primitiveOp: { command: 'set', args: [['hello']] } },
+        }),
+        expect.objectContaining({
+          path: ['properties', 'num1'],
+          args: { primitiveOp: { command: 'set', args: [['42']] } },
+        }),
+        expect.objectContaining({
+          path: ['properties', 'check1'],
+          args: { primitiveOp: { command: 'set', args: [['Yes']] } },
+        }),
       ]),
     )
     expect(output.length).toBeGreaterThan(0)
@@ -2764,7 +2780,7 @@ describe('database update-row', () => {
     const operations = saveCall[2].transactions[0].operations
     const dateOp = operations.find((op) => Array.isArray(op.path) && (op.path as string[]).includes('due1'))
     expect(dateOp).toBeDefined()
-    expect(dateOp?.args).toEqual([
+    expect((dateOp?.args as { primitiveOp: { args: unknown } }).primitiveOp.args).toEqual([
       ['‣', [['d', { type: 'daterange', start_date: '2026-01-01', end_date: '2026-01-15' }]]],
     ])
   })
@@ -2866,7 +2882,9 @@ describe('database update-row', () => {
     const operations = saveCall[2].transactions[0].operations
     const dateOp = operations.find((op) => Array.isArray(op.path) && (op.path as string[]).includes('due1'))
     expect(dateOp).toBeDefined()
-    expect(dateOp?.args).toEqual([['‣', [['d', { type: 'date', start_date: '2026-01-01' }]]]])
+    expect((dateOp?.args as { primitiveOp: { args: unknown } }).primitiveOp.args).toEqual([
+      ['‣', [['d', { type: 'date', start_date: '2026-01-01' }]]],
+    ])
   })
 
   test('update-row throws on unknown property name', async () => {
@@ -3258,13 +3276,18 @@ describe('database delete-property', () => {
     expect(saveCall).toBeDefined()
     const operations = (saveCall![2] as any).transactions[0].operations
     // First op: move to deleted_schema
-    expect(operations[0].command).toBe('update')
+    expect(operations[0].command).toBe('updateCollectionDeletedPropertySchema')
     expect(operations[0].path).toEqual(['deleted_schema'])
-    expect(operations[0].args).toEqual({ prop1: { name: 'Status', type: 'select' } })
+    expect(operations[0].args).toEqual({
+      primitiveOp: { command: 'update', args: { prop1: { name: 'Status', type: 'select' } } },
+    })
     // Second op: null out in schema
-    expect(operations[1].command).toBe('update')
+    expect(operations[1].command).toBe('updateCollectionPropertySchema')
     expect(operations[1].path).toEqual(['schema'])
-    expect(operations[1].args).toEqual({ prop1: null })
+    expect(operations[1].args).toEqual({
+      primitiveOp: { command: 'update', args: { prop1: null } },
+      additionalPropertyIds: [],
+    })
 
     // Output should exclude the deleted property
     const parsed = JSON.parse(output[0])
@@ -3525,10 +3548,10 @@ describe('database delete-property', () => {
     const operations = (saveCall![2] as any).transactions[0].operations
     // First op: move to deleted_schema
     expect(operations[0].path).toEqual(['deleted_schema'])
-    expect(operations[0].args).toEqual({ new_prop: { name: 'Status', type: 'multi_select' } })
+    expect(operations[0].args.primitiveOp.args).toEqual({ new_prop: { name: 'Status', type: 'multi_select' } })
     // Second op: null out in schema
     expect(operations[1].path).toEqual(['schema'])
-    expect(operations[1].args).toEqual({ new_prop: null })
+    expect(operations[1].args.primitiveOp.args).toEqual({ new_prop: null })
   })
 
   test('preserves other properties when deleting one', async () => {
@@ -3632,10 +3655,10 @@ describe('database delete-property', () => {
     const operations = (saveCall![2] as any).transactions[0].operations
     // First op: move to deleted_schema
     expect(operations[0].path).toEqual(['deleted_schema'])
-    expect(operations[0].args).toEqual({ prop2: { name: 'Priority', type: 'select' } })
+    expect(operations[0].args.primitiveOp.args).toEqual({ prop2: { name: 'Priority', type: 'select' } })
     // Second op: null out in schema
     expect(operations[1].path).toEqual(['schema'])
-    expect(operations[1].args).toEqual({ prop2: null })
+    expect(operations[1].args.primitiveOp.args).toEqual({ prop2: null })
   })
 })
 
