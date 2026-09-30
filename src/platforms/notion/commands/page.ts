@@ -626,11 +626,9 @@ export async function handlePageProperties(
   if (parentTable === 'collection' && parentId) {
     const collResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
       requests: [{ pointer: { table: 'collection', id: parentId }, version: -1 }],
-    })) as { recordMap: { collection: Record<string, { value: Record<string, unknown> }> } }
+    })) as { recordMap: { collection?: Record<string, Record<string, unknown>> } }
 
-    const collection = collResponse.recordMap.collection
-      ? Object.values(collResponse.recordMap.collection)[0]?.value
-      : undefined
+    const collection = getRecordValue(Object.values(collResponse.recordMap.collection ?? {})[0])
     if (collection) {
       const schemaMap = buildSchemaMapFromCollection(collection)
       const properties = formatRowProperties(block as unknown as Record<string, unknown>, schemaMap)
