@@ -10,7 +10,7 @@
     {
       "name": "vibe-notion",
       "description": "Interact with Notion workspaces through a CLI interface. Manage pages, query databases with filters, read and write blocks, search across workspace, and manage comments. All output is JSON by default for AI consumption.",
-      "version": "1.11.2",
+      "version": "1.11.3",
       "author": {
         "name": "devxoul",
         "url": "https://github.com/devxoul"
