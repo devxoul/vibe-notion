@@ -2551,6 +2551,121 @@ describe('database update-row', () => {
     expect(output.length).toBeGreaterThan(0)
   })
 
+  test('update-row with multi_select writes all values as one comma-joined text segment', async () => {
+    mock.restore()
+    // Given
+    const mockCollectionResponse = {
+      recordMap: {
+        collection: {
+          'coll-1': {
+            value: {
+              id: 'coll-1',
+              schema: {
+                title: { name: 'Name', type: 'title' },
+                prop1: {
+                  name: 'Platforms',
+                  type: 'multi_select',
+                  options: [
+                    { id: 'aaaa', color: 'green', value: 'Android' },
+                    { id: 'bbbb', color: 'gray', value: 'iOS' },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+    const mockRowResponse = {
+      recordMap: {
+        block: {
+          'row-1': {
+            value: {
+              id: 'row-1',
+              type: 'page',
+              parent_table: 'collection',
+              parent_id: 'coll-1',
+              space_id: 'space-1',
+            },
+          },
+        },
+      },
+    }
+
+    const mockInternalRequest = mock((_token: string, endpoint: string, body: Record<string, unknown>) => {
+      if (endpoint === 'saveTransactions') {
+        return Promise.resolve({})
+      }
+      if (endpoint === 'syncRecordValues') {
+        const requests = body.requests as Array<{ pointer: { table: string } }>
+        if (requests[0]?.pointer.table === 'collection') {
+          return Promise.resolve(mockCollectionResponse)
+        }
+        return Promise.resolve(mockRowResponse)
+      }
+      return Promise.resolve({})
+    })
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mock(() => Promise.resolve({ token_v2: 'test-token' })),
+      generateId: mock(() => 'mock-uuid'),
+      resolveSpaceId: mock(async () => 'space-1'),
+      resolveCollectionViewId: mock(async () => 'view-123'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+      resolveDefaultTeamId: mock(async () => undefined),
+      ensureWorkspaceContext: mock(async (creds, workspaceId) => ({
+        workspaceId: workspaceId ?? 'space-mock',
+        tokenV2: (creds && creds.token_v2) || 'test-token',
+        userId: creds && creds.user_id,
+      })),
+      resolveWorkspaceFromTarget: mock(async () => ({ workspaceId: 'space-mock', tokenV2: 'test-token' })),
+      getAccountTokens: mock((creds) => [
+        { token_v2: (creds && creds.token_v2) || 'test-token', user_id: creds && creds.user_id },
+      ]),
+    }))
+
+    const { databaseCommand } = await import('./database')
+
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      // When
+      await databaseCommand.parseAsync(
+        ['update-row', 'row-1', '--workspace-id', 'space-1', '--properties', '{"Platforms":["Android","iOS"]}'],
+        { from: 'user' },
+      )
+    } finally {
+      console.log = originalLog
+    }
+
+    // Then
+    const saveCall = mockInternalRequest.mock.calls.find((call) => (call as unknown[])[1] === 'saveTransactions') as
+      | [string, string, { transactions: Array<{ operations: Array<Record<string, unknown>> }> }]
+      | undefined
+    expect(saveCall).toBeDefined()
+    if (!saveCall) {
+      throw new Error('Expected saveTransactions call')
+    }
+
+    const operations = saveCall[2].transactions[0].operations
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['properties', 'prop1'],
+          args: { primitiveOp: { command: 'set', args: [['Android,iOS']] } },
+        }),
+      ]),
+    )
+    expect(output.length).toBeGreaterThan(0)
+  })
+
   test('update-row with multiple property types serializes all correctly', async () => {
     mock.restore()
     // Given
