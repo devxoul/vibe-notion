@@ -346,13 +346,10 @@ function serializeMultiSelectProperty(
   registerOption: (propId: string, value: string) => void,
 ): unknown {
   const values = value as string[]
-  const segments: string[] = []
-  for (let i = 0; i < values.length; i++) {
-    if (i > 0) segments.push(',')
-    segments.push(values[i])
-    registerOption(propId, values[i])
+  for (const option of values) {
+    registerOption(propId, option)
   }
-  return [segments]
+  return [[values.join(',')]]
 }
 
 function serializeNumberProperty(value: unknown): unknown {
