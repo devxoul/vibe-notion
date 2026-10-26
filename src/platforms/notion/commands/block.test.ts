@@ -2068,7 +2068,7 @@ describe('blockCommand', () => {
       expect(syncCall).toBeDefined()
     })
 
-    test('merges properties with existing block to prevent data loss', async () => {
+    test('sends only the given properties so other properties stay untouched', async () => {
       // Given
       let syncCallCount = 0
       const mockInternalRequest = mock((_token: string, endpoint: string) => {
@@ -2149,16 +2149,19 @@ describe('blockCommand', () => {
 
       console.log = originalLog
 
-      // Then: saveTransactions should include merged properties (title preserved)
+      // Then: only checked is set, so Notion keeps the title as it is
       const saveCall = mockInternalRequest.mock.calls.find((call) => (call as any[])[1] === 'saveTransactions') as
         | [unknown, unknown, { transactions: Array<{ operations: any[] }> }]
         | undefined
       expect(saveCall).toBeDefined()
-      const operation = saveCall?.[2].transactions[0]?.operations[0]
-      expect(operation?.args.properties).toEqual({
-        title: [['Buy groceries']],
-        checked: [['Yes']],
-      })
+      expect(saveCall?.[2].transactions[0]?.operations).toEqual([
+        {
+          pointer: { table: 'block', id: 'todo-block', spaceId: 'space-123' },
+          command: 'updateBlockPropertyValue',
+          path: ['properties', 'checked'],
+          args: { primitiveOp: { command: 'set', args: [['Yes']] } },
+        },
+      ])
     })
 
     test('skips property merge when content has no properties', async () => {
@@ -2237,9 +2240,20 @@ describe('blockCommand', () => {
 
       // Then: only 1 syncRecordValues call (the verification after save), no pre-fetch
       expect(syncCallCount).toBe(1)
+      const saveCall = mockInternalRequest.mock.calls.find((call) => (call as any[])[1] === 'saveTransactions') as
+        | [unknown, unknown, { transactions: Array<{ operations: any[] }> }]
+        | undefined
+      expect(saveCall?.[2].transactions[0]?.operations).toEqual([
+        {
+          pointer: { table: 'block', id: 'block-123', spaceId: 'space-123' },
+          command: 'update',
+          path: [],
+          args: { format: { width: 100 } },
+        },
+      ])
     })
 
-    test('handles property merge when block has no existing properties', async () => {
+    test('splits properties and other fields into separate operations', async () => {
       // Given
       const mockInternalRequest = mock((_token: string, endpoint: string) => {
         if (endpoint === 'syncRecordValues') {
@@ -2296,7 +2310,7 @@ describe('blockCommand', () => {
       console.log = (msg: string) => output.push(msg)
 
       try {
-        // When: block has no existing properties
+        // When: properties and format are sent together
         await blockCommand.parseAsync(
           [
             'update',
@@ -2304,7 +2318,7 @@ describe('blockCommand', () => {
             '--workspace-id',
             'space-123',
             '--content',
-            JSON.stringify({ properties: { checked: [['Yes']] } }),
+            JSON.stringify({ properties: { title: [['Hi']], checked: [['Yes']] }, format: { block_color: 'red' } }),
           ],
           { from: 'user' },
         )
@@ -2314,15 +2328,19 @@ describe('blockCommand', () => {
 
       console.log = originalLog
 
-      // Then: uses provided properties as-is (no merge needed)
+      // Then: one updateBlockPropertyValue per property, then update for the rest
       const saveCall = mockInternalRequest.mock.calls.find((call) => (call as any[])[1] === 'saveTransactions') as
         | [unknown, unknown, { transactions: Array<{ operations: any[] }> }]
         | undefined
       expect(saveCall).toBeDefined()
-      const operation = saveCall?.[2].transactions[0]?.operations[0]
-      expect(operation?.args.properties).toEqual({
-        checked: [['Yes']],
-      })
+      const operations = saveCall?.[2].transactions[0]?.operations ?? []
+      expect(operations.map((op) => [op.command, op.path])).toEqual([
+        ['updateBlockPropertyValue', ['properties', 'title']],
+        ['updateBlockPropertyValue', ['properties', 'checked']],
+        ['update', []],
+      ])
+      expect(operations[2].args).toEqual({ format: { block_color: 'red' } })
+      expect(operations.some((op) => 'properties' in op.args)).toBe(false)
     })
 
     test('errors on non-object content', async () => {
