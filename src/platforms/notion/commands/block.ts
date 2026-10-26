@@ -73,7 +73,7 @@ type SaveOperation = {
     id: string
     spaceId: string
   }
-  command: 'set' | 'listAfter' | 'listBefore' | 'update' | 'listRemove'
+  command: 'set' | 'listAfter' | 'listBefore' | 'update' | 'listRemove' | 'updateBlockPropertyValue'
   path: string[]
   args: Record<string, unknown>
 }
@@ -468,17 +468,24 @@ export async function handleBlockUpdate(
   await resolveAndSetActiveUserId(tokenV2, args.workspaceId)
   const spaceId = await resolveSpaceId(tokenV2, blockId)
 
-  // Merge properties with existing block to prevent silent data loss.
-  // Without this, sending {properties: {checked: [["Yes"]]}} would wipe out
-  // the title and any other existing properties on the block.
-  if (content.properties) {
-    const existingResponse = (await internalRequest(tokenV2, 'syncRecordValues', {
-      requests: [{ pointer: { table: 'block', id: blockId }, version: -1 }],
-    })) as SyncRecordValuesResponse
-    const existingBlock = assertBlock(getBlockById(existingResponse.recordMap.block, blockId), blockId)
-    if (existingBlock.properties) {
-      content.properties = { ...existingBlock.properties, ...(content.properties as Record<string, unknown>) }
-    }
+  // Notion rejects `update` that carries `properties` with a 400, so each property
+  // goes through `updateBlockPropertyValue`. Properties not sent stay untouched.
+  const { properties, ...rest } = content
+  const operations: SaveOperation[] = Object.entries((properties ?? {}) as Record<string, unknown>).map(
+    ([propId, value]) => ({
+      pointer: { table: 'block', id: blockId, spaceId },
+      command: 'updateBlockPropertyValue',
+      path: ['properties', propId],
+      args: { primitiveOp: { command: 'set', args: value } },
+    }),
+  )
+  if (Object.keys(rest).length > 0) {
+    operations.push({
+      pointer: { table: 'block', id: blockId, spaceId },
+      command: 'update',
+      path: [],
+      args: rest,
+    })
   }
 
   const payload: SaveTransactionsRequest = {
@@ -487,14 +494,7 @@ export async function handleBlockUpdate(
       {
         id: generateId(),
         spaceId,
-        operations: [
-          {
-            pointer: { table: 'block', id: blockId, spaceId },
-            command: 'update',
-            path: [],
-            args: content,
-          },
-        ],
+        operations,
       },
     ],
   }
