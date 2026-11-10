@@ -44,7 +44,7 @@ type SaveOperation = {
     id: string
     spaceId: string
   }
-  command: 'set' | 'listAfter' | 'listBefore' | 'listRemove' | 'update'
+  command: 'set' | 'listAfter' | 'listBefore' | 'listRemove' | 'update' | 'updateBlockPropertyValue'
   path: string[]
   args: Record<string, unknown> | unknown[][]
 }
@@ -340,12 +340,14 @@ export async function handleTableUpdateCell(
   }
 
   const spaceId = await resolveSpaceId(tokenV2, tableId)
+  // Notion rejects a plain `set` on block properties with a 400, so the cell
+  // goes through `updateBlockPropertyValue` like `block update` and `update-row`.
   const operations: SaveOperation[] = [
     {
       pointer: { table: 'block', id: targetRowId, spaceId },
-      command: 'set',
+      command: 'updateBlockPropertyValue',
       path: ['properties', columnId],
-      args: [[args.value]] as unknown as Record<string, unknown>,
+      args: { primitiveOp: { command: 'set', args: [[args.value]] } },
     },
   ]
 
