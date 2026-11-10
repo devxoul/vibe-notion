@@ -435,10 +435,14 @@ describe('tableCommand', () => {
       ]
       expect(saveCall).toBeDefined()
       const operations = saveCall[2].transactions[0].operations
-      const setOp = operations[0]
-      expect((setOp.pointer as Record<string, unknown>).id).toBe('data-row-0')
-      expect(setOp.path).toEqual(['properties', 'col-b'])
-      expect(setOp.args).toEqual([['Updated']])
+      expect(operations).toEqual([
+        {
+          pointer: { table: 'block', id: 'data-row-0', spaceId: 'space-123' },
+          command: 'updateBlockPropertyValue',
+          path: ['properties', 'col-b'],
+          args: { primitiveOp: { command: 'set', args: [['Updated']] } },
+        },
+      ])
     })
 
     test('errors on malformed index like "3abc"', async () => {
