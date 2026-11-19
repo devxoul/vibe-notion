@@ -243,6 +243,9 @@ function convertInlineNode(node: PhrasingContent, annotations: string[][]): Rich
       return segments
     }
 
+    case 'break':
+      return [['\n']]
+
     case 'inlineCode':
       return annotations.length > 0 ? [[node.value, [...annotations, ['c']]]] : [[node.value, [['c']]]]
 
