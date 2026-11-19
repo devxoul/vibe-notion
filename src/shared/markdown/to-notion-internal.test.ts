@@ -39,6 +39,23 @@ describe('markdownToBlocks', () => {
     expect(result).toEqual([{ type: 'text', properties: { title: [['strike', [['s']]]] } }])
   })
 
+  test('hard line break with trailing spaces keeps the newline', () => {
+    const result = markdownToBlocks('first line  \nsecond line')
+    expect(result).toEqual([{ type: 'text', properties: { title: [['first line'], ['\n'], ['second line']] } }])
+  })
+
+  test('hard line break with backslash keeps the newline', () => {
+    const result = markdownToBlocks('first line\\\nsecond line')
+    expect(result).toEqual([{ type: 'text', properties: { title: [['first line'], ['\n'], ['second line']] } }])
+  })
+
+  test('hard line break inside formatted text and list items', () => {
+    const result = markdownToBlocks('- **bold**  \n`code`')
+    expect(result).toEqual([
+      { type: 'bulleted_list', properties: { title: [['bold', [['b']]], ['\n'], ['code', [['c']]]] } },
+    ])
+  })
+
   test('inline code', () => {
     const result = markdownToBlocks('`code`')
     expect(result).toEqual([{ type: 'text', properties: { title: [['code', [['c']]]] } }])
