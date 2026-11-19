@@ -1954,6 +1954,92 @@ describe('PageCommand', () => {
     expect(result.archived).toBe(true)
   })
 
+  test('page archive for database row only marks it not alive', async () => {
+    const savedBodies: any[] = []
+    const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
+      if (endpoint === 'syncRecordValues') {
+        return {
+          recordMap: {
+            block: {
+              'page-1': {
+                value: {
+                  id: 'page-1',
+                  type: 'page',
+                  parent_id: 'collection-1',
+                  parent_table: 'collection',
+                  space_id: 'space-123',
+                  alive: true,
+                },
+                role: 'editor',
+              },
+            },
+          },
+        }
+      }
+      if (endpoint === 'saveTransactions') {
+        savedBodies.push(body)
+        return {}
+      }
+      return {}
+    })
+
+    const mockGetCredentials = mock(async () => ({
+      token_v2: 'test-token',
+    }))
+
+    const mockGenerateId = mock(() => 'uuid-1')
+
+    const mockResolveSpaceId = mock(async () => 'space-123')
+
+    mock.module('../client', () => ({
+      internalRequest: mockInternalRequest,
+    }))
+
+    mock.module('./helpers', () => ({
+      getCredentialsOrExit: mockGetCredentials,
+      generateId: mockGenerateId,
+      resolveSpaceId: mockResolveSpaceId,
+      resolveCollectionViewId: mock(async () => 'view-mock'),
+      resolveAndSetActiveUserId: mock(async () => {}),
+      resolveBacklinkUsers: mock(async () => ({})),
+      resolveDefaultTeamId: mock(async () => undefined),
+      ensureWorkspaceContext: mock(async (creds, workspaceId) => ({
+        workspaceId: workspaceId ?? 'space-mock',
+        tokenV2: (creds && creds.token_v2) || 'test-token',
+        userId: creds && creds.user_id,
+      })),
+      resolveWorkspaceFromTarget: mock(async () => ({ workspaceId: 'space-mock', tokenV2: 'test-token' })),
+      getAccountTokens: mock((creds) => [
+        { token_v2: (creds && creds.token_v2) || 'test-token', user_id: creds && creds.user_id },
+      ]),
+    }))
+
+    const { pageCommand } = await import('./page')
+    const output: string[] = []
+    const originalLog = console.log
+    console.log = (msg: string) => output.push(msg)
+
+    try {
+      await pageCommand.parseAsync(['archive', 'page-1', '--workspace-id', 'space-123'], { from: 'user' })
+    } catch {
+      // Expected to exit
+    }
+
+    console.log = originalLog
+
+    expect(output.length).toBeGreaterThan(0)
+    const result = JSON.parse(output[0])
+    expect(result.archived).toBe(true)
+    expect(savedBodies[0].transactions[0].operations).toEqual([
+      {
+        pointer: { table: 'block', id: 'page-1', spaceId: 'space-123' },
+        command: 'update',
+        path: [],
+        args: { alive: false },
+      },
+    ])
+  })
+
   test('page archive for child page removes from block content', async () => {
     const mockInternalRequest = mock(async (_tokenV2: string, endpoint: string, body: any) => {
       if (endpoint === 'syncRecordValues') {

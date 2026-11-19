@@ -527,28 +527,28 @@ export async function handleBlockDelete(
   const parentId = block.parent_id
   const spaceId = await resolveSpaceId(tokenV2, blockId)
 
+  const operations: SaveOperation[] = [
+    {
+      pointer: { table: 'block', id: blockId, spaceId },
+      command: 'update',
+      path: [],
+      args: { alive: false },
+    },
+  ]
+  // Database rows hang off the collection, not a parent block's `content` list,
+  // so there is nothing to remove there and Notion rejects the attempt with a 400.
+  if (block.parent_table !== 'collection') {
+    operations.push({
+      pointer: { table: 'block', id: parentId, spaceId },
+      command: 'listRemove',
+      path: ['content'],
+      args: { id: blockId },
+    })
+  }
+
   const payload: SaveTransactionsRequest = {
     requestId: generateId(),
-    transactions: [
-      {
-        id: generateId(),
-        spaceId,
-        operations: [
-          {
-            pointer: { table: 'block', id: blockId, spaceId },
-            command: 'update',
-            path: [],
-            args: { alive: false },
-          },
-          {
-            pointer: { table: 'block', id: parentId, spaceId },
-            command: 'listRemove',
-            path: ['content'],
-            args: { id: blockId },
-          },
-        ],
-      },
-    ],
+    transactions: [{ id: generateId(), spaceId, operations }],
   }
 
   await internalRequest(tokenV2, 'saveTransactions', payload)

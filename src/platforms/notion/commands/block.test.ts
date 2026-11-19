@@ -2564,6 +2564,84 @@ describe('blockCommand', () => {
       )
     })
 
+    test('database row only sends alive:false without listRemove', async () => {
+      // Given
+      const mockInternalRequest = mock((_token: string, endpoint: string) => {
+        if (endpoint === 'syncRecordValues') {
+          return Promise.resolve({
+            recordMap: {
+              block: {
+                'block-123': {
+                  value: {
+                    id: 'block-123',
+                    type: 'text',
+                    parent_id: 'collection-1',
+                    parent_table: 'collection',
+                    space_id: 'space-1',
+                    alive: true,
+                  },
+                  role: 'editor',
+                },
+              },
+            },
+          })
+        }
+        return Promise.resolve({})
+      })
+      const mockGetCredentials = mock(() => Promise.resolve({ token_v2: 'test-token', space_id: 'space-123' }))
+      const mockResolveSpaceId = mock(() => Promise.resolve('space-123'))
+      const mockGenerateId = mock(() => 'mock-uuid')
+
+      mock.module('../client', () => ({
+        internalRequest: mockInternalRequest,
+      }))
+
+      mock.module('./helpers', () => ({
+        getCredentialsOrExit: mockGetCredentials,
+        generateId: mockGenerateId,
+        resolveSpaceId: mockResolveSpaceId,
+        resolveCollectionViewId: mock(() => Promise.resolve('view-123')),
+        resolveAndSetActiveUserId: mock(() => Promise.resolve()),
+        resolveBacklinkUsers: mock(async () => ({})),
+        resolveDefaultTeamId: mock(async () => undefined),
+        ensureWorkspaceContext: mock(async (creds, workspaceId) => ({
+          workspaceId: workspaceId ?? 'space-mock',
+          tokenV2: (creds && creds.token_v2) || 'test-token',
+          userId: creds && creds.user_id,
+        })),
+        resolveWorkspaceFromTarget: mock(async () => ({ workspaceId: 'space-mock', tokenV2: 'test-token' })),
+        getAccountTokens: mock((creds) => [
+          { token_v2: (creds && creds.token_v2) || 'test-token', user_id: creds && creds.user_id },
+        ]),
+      }))
+
+      const { blockCommand } = await import('./block')
+      const output: string[] = []
+      const originalLog = console.log
+      console.log = (msg: string) => output.push(msg)
+
+      try {
+        // When
+        await blockCommand.parseAsync(['delete', 'block-123', '--workspace-id', 'space-123'], { from: 'user' })
+      } catch {
+        // Expected to exit
+      }
+
+      console.log = originalLog
+
+      // Then
+      const saveCall = mockInternalRequest.mock.calls.find(([, endpoint]) => endpoint === 'saveTransactions')
+      expect(saveCall?.[2].transactions[0].operations).toEqual([
+        {
+          pointer: { table: 'block', id: 'block-123', spaceId: 'space-123' },
+          command: 'update',
+          path: [],
+          args: { alive: false },
+        },
+      ])
+      expect(output.length).toBeGreaterThan(0)
+      expect(JSON.parse(output[0]).deleted).toBe(true)
+    })
     test('errors when block has no parent_id', async () => {
       // Given
       const mockInternalRequest = mock((_token: string, endpoint: string) => {

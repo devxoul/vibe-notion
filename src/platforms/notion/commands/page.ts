@@ -701,8 +701,12 @@ export async function handlePageArchive(
     throw new Error(`Could not determine parent_id or space_id for page: ${pageId}`)
   }
 
-  let listRemoveOp: Operation
-  if (parentTable === 'team') {
+  // Database rows hang off the collection, not a parent block's `content` list,
+  // so there is nothing to remove there and Notion rejects the attempt with a 400.
+  let listRemoveOp: Operation | undefined
+  if (parentTable === 'collection') {
+    listRemoveOp = undefined
+  } else if (parentTable === 'team') {
     listRemoveOp = {
       pointer: { table: 'team', id: parentId, spaceId },
       command: 'listRemove',
@@ -732,7 +736,7 @@ export async function handlePageArchive(
       path: [],
       args: { alive: false },
     },
-    listRemoveOp,
+    ...(listRemoveOp ? [listRemoveOp] : []),
   ]
 
   await internalRequest(tokenV2, 'saveTransactions', {
